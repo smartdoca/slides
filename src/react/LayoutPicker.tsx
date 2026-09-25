@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n";
 import type { LayoutKind } from "../model/layouts";
 export function LayoutPicker({
   disabled,
@@ -13,6 +14,7 @@ export function LayoutPicker({
 }) {
   const [open, setOpen] = useState(false),
     [dark, setDark] = useState(true);
+  const t = useT();
   const root = useRef<HTMLDivElement>(null),
     trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -40,12 +42,12 @@ export function LayoutPicker({
     >
       <div className="eppt-split-button">
         <button disabled={disabled} onClick={() => onPick("blank", false)}>
-          ＋ 新建幻灯片
+          {t("layout.new")}
         </button>
         <button
           ref={trigger}
           disabled={disabled}
-          aria-label="选择新幻灯片版式"
+          aria-label={t("layout.choose")}
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >
@@ -54,7 +56,7 @@ export function LayoutPicker({
       </div>
       <button
         className="eppt-collapse-rail"
-        aria-label={collapsed ? "展开幻灯片列表" : "收起幻灯片列表"}
+        aria-label={collapsed ? t("layout.expandRail") : t("layout.collapseRail")}
         onClick={onCollapse}
       >
         {collapsed ? "»" : "«"}
@@ -63,16 +65,16 @@ export function LayoutPicker({
         <div
           className="eppt-layout-picker"
           role="group"
-          aria-label="新幻灯片版式"
+          aria-label={t("layout.group")}
         >
           <div className="eppt-picker-heading">
-            <span>新建幻灯片</span>
+            <span>{t("layout.heading")}</span>
             <div>
               <button aria-pressed={dark} onClick={() => setDark(true)}>
-                深色
+                {t("layout.dark")}
               </button>
               <button aria-pressed={!dark} onClick={() => setDark(false)}>
-                浅色
+                {t("layout.light")}
               </button>
             </div>
           </div>
@@ -95,46 +97,56 @@ export function LayoutPicker({
                       <>
                         <b>
                           {kind === "agenda"
-                            ? "目录"
+                            ? t("layout.sampleAgenda")
                             : kind === "cover"
-                              ? "演示文稿标题"
-                              : "标题和描述"}
+                              ? t("layout.sampleTitle")
+                              : t("layout.sampleColumns")}
                         </b>
                         {kind === "agenda" ? (
                           <div className="sample-agenda">
                             {Array.from({ length: 6 }, (_, i) => (
                               <span key={i}>
-                                <i>{i + 1}</i>目录标题
+                                <i>{i + 1}</i>
+                                {t("layout.sampleAgendaItem")}
                               </span>
                             ))}
                           </div>
                         ) : kind === "columns" ? (
                           <div className="sample-columns">
                             <span>
-                              主题标题一
+                              {t("layout.sampleTopic1")}
                               <hr />
                               <hr />
                               <hr />
                             </span>
                             <span>
-                              主题标题二
+                              {t("layout.sampleTopic2")}
                               <hr />
                               <hr />
                               <hr />
                             </span>
                           </div>
                         ) : (
-                          <small>点击编辑副标题</small>
+                          <small>{t("layout.sampleSubtitle")}</small>
                         )}
                       </>
                     )}
                   </div>
-                  <span>{["空白", "封面", "目录", "双栏内容"][i]}</span>
+                  <span>
+                    {
+                      [
+                        t("layout.blank"),
+                        t("layout.cover"),
+                        t("layout.agenda"),
+                        t("layout.columns"),
+                      ][i]
+                    }
+                  </span>
                 </button>
               ),
             )}
           </div>
-          <p>插入可编辑内容，不改变已有幻灯片</p>
+          <p>{t("layout.note")}</p>
         </div>
       )}
     </div>

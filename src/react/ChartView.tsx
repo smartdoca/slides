@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 import type { ChartElement } from "../model/types";
 import { chartSvg } from "./chart-renderer";
 import { chartSeries } from "../model/chart";
@@ -6,6 +7,7 @@ import { chartSeries } from "../model/chart";
 export function ChartView({ element }: { element: ChartElement }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState(false);
+  const t = useT();
   const key = JSON.stringify([
     element.chartType,
     element.labels,
@@ -36,7 +38,7 @@ export function ChartView({ element }: { element: ChartElement }) {
     };
   }, [key]);
   return error ? (
-    <span role="alert">图表加载失败</span>
+    <span role="alert">{t("chart.loadFailed")}</span>
   ) : url ? (
     <img
       src={url}

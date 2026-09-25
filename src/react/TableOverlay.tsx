@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { displayMessage, useT } from "../i18n";
 import { pxToEmu, type TableElement } from "../model/types";
 import type { EditorController } from "../model/controller";
 import { tableIds } from "../model/table";
@@ -17,11 +18,12 @@ export function TableOverlay({
   viewScale?: number;
   actions?: ReactNode;
 }) {
-  const t = tableIds(element),
+  const t = useT();
+  const ids = tableIds(element),
     root = useRef<HTMLDivElement>(null);
   const [cell, setCell] = useState({
-      row: t.rowIds[0],
-      column: t.columnIds[0],
+      row: ids.rowIds[0],
+      column: ids.columnIds[0],
     }),
     [editing, setEditing] = useState(false),
     [draft, setDraft] = useState(""),
@@ -31,14 +33,14 @@ export function TableOverlay({
   const dragging = useRef<{ x: number; y: number } | null>(null),
     [offset, setOffset] = useState({ x: 0, y: 0 });
   useEffect(() => {
-    if (!t.rowIds.includes(cell.row) || !t.columnIds.includes(cell.column)) {
+    if (!ids.rowIds.includes(cell.row) || !ids.columnIds.includes(cell.column)) {
       editingRef.current = false;
       setEditing(false);
-      setCell({ row: t.rowIds[0], column: t.columnIds[0] });
+      setCell({ row: ids.rowIds[0], column: ids.columnIds[0] });
     }
-  }, [t.rowIds.join(), t.columnIds.join()]);
-  const row = t.rowIds.indexOf(cell.row),
-    column = t.columnIds.indexOf(cell.column);
+  }, [ids.rowIds.join(), ids.columnIds.join()]);
+  const row = ids.rowIds.indexOf(cell.row),
+    column = ids.columnIds.indexOf(cell.column);
   const commit = () => {
     if (!editingRef.current) return;
     editingRef.current = false;
@@ -50,19 +52,19 @@ export function TableOverlay({
     });
     setEditing(false);
     if (!ok)
-      setMessage("此单元格已变化或不再可编辑，未覆盖协作者内容。请重新编辑。");
+      setMessage("table.conflict");
   };
   const insert = (axis: "row" | "column", before = false) => {
     commit();
-    const ids = axis === "row" ? t.rowIds : t.columnIds,
+    const axisIds = axis === "row" ? ids.rowIds : ids.columnIds,
       index = axis === "row" ? row : column;
     controller.tableCommand(slideId, element.id, {
       kind: axis === "row" ? "insert-row" : "insert-column",
-      after: before ? (ids[index - 1] ?? null) : ids[index],
+      after: before ? (axisIds[index - 1] ?? null) : axisIds[index],
     });
   };
   const focusCell = (r: number, c: number) => {
-    setCell({ row: t.rowIds[r], column: t.columnIds[c] });
+    setCell({ row: ids.rowIds[r], column: ids.columnIds[c] });
     setEditing(false);
     requestAnimationFrame(() =>
       root.current
@@ -100,7 +102,7 @@ export function TableOverlay({
           const r = Math.max(
               0,
               Math.min(
-                t.rowIds.length - 1,
+                ids.rowIds.length - 1,
                 row +
                   (e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0),
               ),
@@ -108,7 +110,7 @@ export function TableOverlay({
             c = Math.max(
               0,
               Math.min(
-                t.columnIds.length - 1,
+                ids.columnIds.length - 1,
                 column +
                   (e.key === "ArrowRight" || e.key === "Tab"
                     ? 1
@@ -130,11 +132,11 @@ export function TableOverlay({
       <div
         className="eppt-table-commands"
         role="toolbar"
-        aria-label="表格行列操作"
+        aria-label={t("table.commands")}
       >
         <button
-          aria-label="移动表格"
-          title="拖动移动表格"
+          aria-label={t("table.move")}
+          title={t("table.moveHint")}
           style={{ cursor: "move", touchAction: "none" }}
           onPointerDown={(e) => {
             commit();
@@ -172,33 +174,33 @@ export function TableOverlay({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert("row", true)}
-          disabled={t.rowIds.length >= 100}
+          disabled={ids.rowIds.length >= 100}
         >
-          上方插行
+          {t("table.insertRowAbove")}
         </button>
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert("row")}
-          disabled={t.rowIds.length >= 100}
+          disabled={ids.rowIds.length >= 100}
         >
-          下方插行
+          {t("table.insertRowBelow")}
         </button>
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert("column", true)}
-          disabled={t.columnIds.length >= 100}
+          disabled={ids.columnIds.length >= 100}
         >
-          左侧插列
+          {t("table.insertColLeft")}
         </button>
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert("column")}
-          disabled={t.columnIds.length >= 100}
+          disabled={ids.columnIds.length >= 100}
         >
-          右侧插列
+          {t("table.insertColRight")}
         </button>
         <button
-          disabled={t.rowIds.length <= 1}
+          disabled={ids.rowIds.length <= 1}
           onClick={() => {
             setEditing(false);
             controller.tableCommand(slideId, element.id, {
@@ -207,10 +209,10 @@ export function TableOverlay({
             });
           }}
         >
-          删除行
+          {t("table.deleteRow")}
         </button>
         <button
-          disabled={t.columnIds.length <= 1}
+          disabled={ids.columnIds.length <= 1}
           onClick={() => {
             setEditing(false);
             controller.tableCommand(slideId, element.id, {
@@ -219,20 +221,20 @@ export function TableOverlay({
             });
           }}
         >
-          删除列
+          {t("table.deleteCol")}
         </button>
         {actions}
       </div>
-      <table role="grid" aria-label="幻灯片表格">
+      <table role="grid" aria-label={t("table.grid")}>
         <tbody>
           {element.cells.map((cells, r) => (
-            <tr key={t.rowIds[r]}>
+            <tr key={ids.rowIds[r]}>
               {cells.map((value, c) => {
                 const active =
-                  cell.row === t.rowIds[r] && cell.column === t.columnIds[c];
+                  cell.row === ids.rowIds[r] && cell.column === ids.columnIds[c];
                 return (
                   <td
-                    key={t.columnIds[c]}
+                    key={ids.columnIds[c]}
                     style={{
                       background:
                         r === 0
@@ -247,7 +249,10 @@ export function TableOverlay({
                     {active && editing ? (
                       <textarea
                         autoFocus
-                        aria-label={`第 ${r + 1} 行第 ${c + 1} 列内容`}
+                        aria-label={t("table.cellEdit", {
+                          row: r + 1,
+                          column: c + 1,
+                        })}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         onBlur={commit}
@@ -268,16 +273,16 @@ export function TableOverlay({
                               Math.max(
                                 0,
                                 Math.min(
-                                  t.rowIds.length - 1,
+                                  ids.rowIds.length - 1,
                                   r +
-                                    (next >= t.columnIds.length
+                                    (next >= ids.columnIds.length
                                       ? 1
                                       : next < 0
                                         ? -1
                                         : 0),
                                 ),
                               ),
-                              (next + t.columnIds.length) % t.columnIds.length,
+                              (next + ids.columnIds.length) % ids.columnIds.length,
                             );
                           }
                         }}
@@ -286,12 +291,16 @@ export function TableOverlay({
                       <button
                         data-r={r}
                         data-c={c}
-                        aria-label={`第 ${r + 1} 行第 ${c + 1} 列：${value || "空白"}`}
+                        aria-label={t("table.cell", {
+                          row: r + 1,
+                          column: c + 1,
+                          value: value || t("table.empty"),
+                        })}
                         aria-selected={active}
                         tabIndex={active ? 0 : -1}
                         onClick={() => {
                           commit();
-                          setCell({ row: t.rowIds[r], column: t.columnIds[c] });
+                          setCell({ row: ids.rowIds[r], column: ids.columnIds[c] });
                           baseline.current = value;
                           setDraft(value);
                           editingRef.current = true;
@@ -310,14 +319,14 @@ export function TableOverlay({
       </table>
       <button
         className="eppt-table-add-row"
-        aria-label="在表格末尾增加一行"
-        disabled={t.rowIds.length >= 100}
+        aria-label={t("table.addRow")}
+        disabled={ids.rowIds.length >= 100}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           commit();
           controller.tableCommand(slideId, element.id, {
             kind: "insert-row",
-            after: t.rowIds.at(-1)!,
+            after: ids.rowIds.at(-1)!,
           });
         }}
       >
@@ -325,14 +334,14 @@ export function TableOverlay({
       </button>
       <button
         className="eppt-table-add-column"
-        aria-label="在表格末尾增加一列"
-        disabled={t.columnIds.length >= 100}
+        aria-label={t("table.addColumn")}
+        disabled={ids.columnIds.length >= 100}
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           commit();
           controller.tableCommand(slideId, element.id, {
             kind: "insert-column",
-            after: t.columnIds.at(-1)!,
+            after: ids.columnIds.at(-1)!,
           });
         }}
       >
@@ -340,7 +349,7 @@ export function TableOverlay({
       </button>
       {message && (
         <div className="eppt-table-message" role="alert">
-          {message}
+          {displayMessage(t, message)}
         </div>
       )}
     </div>

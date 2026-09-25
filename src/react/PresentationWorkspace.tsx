@@ -7,6 +7,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  createTranslator,
+  htmlLang,
+  I18nProvider,
+  noticeFromError,
+  phraseText,
+  type Phrase,
+} from "../i18n";
 import { Editor, Transforms, Element as SlateElement } from "slate";
 import { flushSync } from "react-dom";
 import type * as Y from "yjs";
@@ -95,6 +103,10 @@ export interface PresentationWorkspaceProps {
   onExport?: (format: "pptx" | "json" | "pdf") => Promise<void> | void;
   onImport?: (file: File, context: PresentationImportContext) => Promise<void>;
   onReconnect?: () => void;
+  /** Interface language. Defaults to Chinese. Unknown codes use English. */
+  locale?: string;
+  /** Replaces individual catalog keys. Does not change document content. */
+  messages?: Record<string, string>;
 }
 export interface PresentationWorkspaceHandle {
   getSelection(): EditorSelection;
@@ -115,6 +127,10 @@ export const PresentationWorkspace = forwardRef<
   PresentationWorkspaceProps
 >(function PresentationWorkspace(props, ref) {
   const value = usePresentation(props.document);
+  const t = useMemo(
+    () => createTranslator(props.locale, props.messages),
+    [props.locale, props.messages],
+  );
   const [printing, setPrinting] = useState(false);
   useEffect(() => {
     // display:none does not avoid rendering thousands of hidden slide elements.
@@ -142,7 +158,7 @@ export const PresentationWorkspace = forwardRef<
     props.onPresentationChange?.(next);
   };
   const [step, setStep] = useState(0);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<Phrase | null>(null);
   const [busy, setBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [cropping, setCropping] = useState<{
@@ -151,7 +167,9 @@ export const PresentationWorkspace = forwardRef<
   } | null>(null);
   const [textEditor, setTextEditor] = useState<Editor | null>(null);
   const [, refreshFormat] = useState(0);
-  const [tab, setTab] = useState("插入");
+  const [tab, setTab] = useState<
+    "insert" | "home" | "design" | "animation" | "file"
+  >("insert");
   const [localProperties, setLocalProperties] = useState(false);
   const [localRail, setLocalRail] = useState(false);
   const [pageToolsContainer, setPageToolsContainer] = useState<HTMLDivElement | null>(null);
@@ -220,11 +238,11 @@ export const PresentationWorkspace = forwardRef<
   }, [props.readOnly, props.document, slideId]);
   const runAsync = async (action: () => Promise<void> | void) => {
     setBusy(true);
-    setMessage("");
+      setMessage(null);
     try {
       await action();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      setMessage(noticeFromError(error));
     } finally {
       setBusy(false);
     }
@@ -235,7 +253,7 @@ export const PresentationWorkspace = forwardRef<
       if (textEditor && YjsEditor.isYjsEditor(textEditor))
         YjsEditor.flushLocalChanges(textEditor);
       await props.onExport("pptx");
-      setMessage("PPTX 已生成，请查看浏览器下载。");
+      setMessage({ key: "alert.pptxReady" });
     });
   const select = (ids: string[]) => {
     const expanded = controller.expandSelection(slideId, ids);
@@ -288,7 +306,7 @@ export const PresentationWorkspace = forwardRef<
       editorHandle.current?.finishTextEdit();
     },
     exportCurrentPng: async () => {
-      if (!editorHandle.current) throw new Error("当前幻灯片尚未就绪");
+      if (!editorHandle.current) throw new Error(t("error.slideNotReady"));
       return editorHandle.current.exportPng();
     },
   }));
@@ -310,7 +328,23 @@ export const PresentationWorkspace = forwardRef<
   const insertLayout = (kind: LayoutKind, dark: boolean) => {
     if (disabled) return;
     switchSlide(
-      controller.addSlide(slideId, createSlideLayout(kind, value.size, dark)),
+      controller.addSlide(
+      slideId,
+      createSlideLayout(kind, value.size, dark, {
+        blank: t("layout.blank"),
+        cover: t("layout.cover"),
+        agenda: t("layout.agenda"),
+        columns: t("layout.columns"),
+        title: t("layout.sampleTitle"),
+        subtitle: t("layout.sampleSubtitle"),
+        agendaHeading: t("layout.sampleAgenda"),
+        agendaItem: t("layout.sampleAgendaItem"),
+        columnsHeading: t("layout.sampleColumns"),
+        topic1: t("layout.sampleTopic1"),
+        topic2: t("layout.sampleTopic2"),
+        body: t("layout.body"),
+      }),
+    ),
     );
   };
   const add = (kind: Parameters<EditorController["add"]>[1]) => {
@@ -388,7 +422,7 @@ export const PresentationWorkspace = forwardRef<
     if (!presenting) return;
     if (!showOrder.length) {
       setPresenting(false);
-      setMessage("所有幻灯片均已隐藏，请先取消隐藏再放映。");
+      setMessage({ key: "alert.allHidden" });
     } else if (!showOrder.includes(slideId)) {
       const index = value.slideOrder.indexOf(slideId);
       switchSlide(showOrder.find(id => value.slideOrder.indexOf(id) >= index) ?? showOrder[0]);
@@ -437,7 +471,7 @@ export const PresentationWorkspace = forwardRef<
       });
       if (cancel.signal.aborted || mode.current) return;
       if (!readDocument(controller.doc).slideOrder.includes(target))
-        throw new Error("目标幻灯片已删除，未插入迟到的图片。");
+        throw new Error(t("error.slideDeleted"));
       const width = Math.min(600, asset.width),
         height = (width * asset.height) / asset.width;
       const id = createId("image");
@@ -460,7 +494,9 @@ export const PresentationWorkspace = forwardRef<
     }
   }
   return (
+    <I18nProvider value={t}>
     <div
+      lang={htmlLang(props.locale)}
       className={
         "eppt-workspace " +
         (props.chrome === "demo" ? "eppt-demo-chrome" : "eppt-embedded")
@@ -554,35 +590,41 @@ export const PresentationWorkspace = forwardRef<
           </div>
           <div className="eppt-title">
             <CommitInput
-              aria-label="文稿标题"
+              aria-label={t("menu.title")}
               key={value.id}
               value={value.title}
               onCommit={(title) =>
-                props.onTitleChange?.(title || "未命名演示文稿")
+                props.onTitleChange?.(title || t("menu.untitled"))
               }
               disabled={disabled || !props.onTitleChange}
             />
             <span className="eppt-save">
               <i />
-              {props.saveLabel ?? "本地文档"}
+              {props.saveLabel ?? t("menu.localDoc")}
             </span>
           </div>
-          <nav className="eppt-document-menu" aria-label="文稿菜单">
-            {(["文件", "开始", "设计"] as const).map((item) => (
+          <nav className="eppt-document-menu" aria-label={t("menu.document")}>
+            {(
+              [
+                ["file", "menu.file"],
+                ["home", "menu.home"],
+                ["design", "menu.design"],
+              ] as const
+            ).map(([item, label]) => (
               <button
                 key={item}
                 aria-pressed={tab === item}
-                onClick={() => setTab(tab === item ? "插入" : item)}
+                onClick={() => setTab(tab === item ? "insert" : item)}
               >
-                {item === "开始" ? "编辑" : item}
+                {t(label)}
                 <span>⌄</span>
               </button>
             ))}
           </nav>
           <div className="eppt-history-actions">
             <button
-              aria-label="撤销"
-              title="撤销 ⌘ / Ctrl Z"
+              aria-label={t("toolbar.undo")}
+              title={t("toolbar.undoShortcut")}
               disabled={disabled || !controller.history.undoStack.length}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
@@ -594,8 +636,8 @@ export const PresentationWorkspace = forwardRef<
               <ToolIcon kind="undo" />
             </button>
             <button
-              aria-label="重做"
-              title="重做 ⇧⌘Z / Ctrl Y"
+              aria-label={t("toolbar.redo")}
+              title={t("toolbar.redoShortcut")}
               disabled={disabled || !controller.history.redoStack.length}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => controller.redo()}
@@ -618,19 +660,19 @@ export const PresentationWorkspace = forwardRef<
             {props.onReconnect && props.status !== "已连接" ? (
               <button
                 onClick={props.onReconnect}
-                title="重连并补拉未确认的更新"
+                title={t("menu.reconnect")}
               >
-                重新连接
+                {t("menu.reconnectButton")}
               </button>
             ) : null}
             <button
               disabled={disabled || !props.onImport}
               onClick={() => setImportOpen(true)}
             >
-              上传 PPTX
+              {t("menu.upload")}
             </button>
             <button onClick={downloadPptx} disabled={busy || !props.onExport}>
-              {busy ? "正在处理…" : "下载 PPTX"}
+              {busy ? t("menu.downloadBusy") : t("menu.download")}
             </button>
             <button
               className="eppt-primary"
@@ -641,7 +683,7 @@ export const PresentationWorkspace = forwardRef<
               }}
               disabled={!slide}
             >
-              <ToolIcon kind="present" /> 开始放映
+              <ToolIcon kind="present" /> {t("toolbar.present")}
             </button>
           </div>
         </header>
@@ -649,7 +691,7 @@ export const PresentationWorkspace = forwardRef<
       <div
         className={
           "eppt-toolbar " +
-          (tab === "插入" ? "eppt-ribbon" : "eppt-ribbon-options")
+          (tab === "insert" ? "eppt-ribbon" : "eppt-ribbon-options")
         }
       >
         <LayoutPicker
@@ -659,11 +701,11 @@ export const PresentationWorkspace = forwardRef<
           onCollapse={() => setRailCollapsed(!railCollapsed)}
         />
         <div className={props.chrome !== "demo" ? "eppt-flat-tools" : "eppt-toolbar-inline"}>
-        <div ref={setPageToolsContainer} className="eppt-page-tools" role="group" aria-label="幻灯片操作" />
+        <div ref={setPageToolsContainer} className="eppt-page-tools" role="group" aria-label={t("toolbar.slideActions")} />
         {props.chrome !== "demo" && (
           <>
             <button
-              className="eppt-present-action" title="开始放映" aria-label="开始放映"
+              className="eppt-present-action" title={t("toolbar.present")} aria-label={t("toolbar.present")}
               disabled={!slide}
               onClick={() => {
                 setStep(0);
@@ -673,35 +715,35 @@ export const PresentationWorkspace = forwardRef<
             >
               <ToolIcon kind="present" />
             </button>
-            <div className="eppt-toolgroup eppt-history-actions" role="group" aria-label="历史操作">
-              <button title="撤销 ⌘Z" aria-label="撤销"
+            <div className="eppt-toolgroup eppt-history-actions" role="group" aria-label={t("toolbar.history")}>
+              <button title={t("toolbar.undoShortcutShort")} aria-label={t("toolbar.undo")}
                 disabled={disabled || !controller.history.undoStack.length}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   if (textEditor && YjsEditor.isYjsEditor(textEditor)) YjsEditor.flushLocalChanges(textEditor);
                   controller.undo();
                 }}><ToolIcon kind="undo" /></button>
-              <button title="重做 ⇧⌘Z" aria-label="重做"
+              <button title={t("toolbar.redoShortcutShort")} aria-label={t("toolbar.redo")}
                 disabled={disabled || !controller.history.redoStack.length}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => controller.redo()}><ToolIcon kind="redo" /></button>
             </div>
           </>
         )}
-        {tab !== "插入" && (
+        {tab !== "insert" && (
           <button
             className="eppt-back-tools"
-            onClick={() => setTab("插入")}
-            title="返回插入工具"
+            onClick={() => setTab("insert")}
+            title={t("toolbar.back")}
           >
-            ‹ 返回
+            {t("toolbar.backLabel")}
           </button>
         )}
-        {tab === "开始" && props.chrome === "demo" ? (
-          <div className={props.chrome !== "demo" ? "eppt-toolbar-dropdown" : "eppt-toolbar-inline"} role="group" aria-label="编辑设置">
+        {tab === "home" && props.chrome === "demo" ? (
+          <div className={props.chrome !== "demo" ? "eppt-toolbar-dropdown" : "eppt-toolbar-inline"} role="group" aria-label={t("toolbar.editSettings")}>
             <div className="eppt-toolgroup">
               <button
-                title="撤销 ⌘Z"
+                title={t("toolbar.undoShortcutShort")}
                 disabled={disabled || !controller.history.undoStack.length}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
@@ -710,14 +752,14 @@ export const PresentationWorkspace = forwardRef<
                   controller.undo();
                 }}
               >
-                ↶ 撤销
+                {t("toolbar.undoText")}
               </button>
               <button
-                title="重做 ⇧⌘Z"
+                title={t("toolbar.redoShortcutShort")}
                 disabled={disabled || !controller.history.redoStack.length}
                 onClick={() => controller.redo()}
               >
-                ↷
+                {t("toolbar.redoIcon")}
               </button>
             </div>
             <div className="eppt-toolgroup">
@@ -725,18 +767,18 @@ export const PresentationWorkspace = forwardRef<
                 disabled={disabled}
                 onClick={() => switchSlide(controller.addSlide(slideId))}
               >
-                ＋ 新建幻灯片
+                {t("toolbar.newSlide")}
               </button>
               <button
                 disabled={disabled || !slide}
                 onClick={() => switchSlide(controller.addSlide(slideId, slide))}
               >
-                复制页面
+                {t("toolbar.duplicateSlide")}
               </button>
             </div>
             <div className="eppt-toolgroup">
               <select
-                aria-label="字体"
+                aria-label={t("toolbar.font")}
                 disabled={disabled}
                 value={marks?.fontFamily ?? "Arial"}
                 onChange={(e) => format({ fontFamily: e.target.value })}
@@ -752,7 +794,7 @@ export const PresentationWorkspace = forwardRef<
                 ))}
               </select>
               <input
-                aria-label="字号"
+                aria-label={t("toolbar.fontSize")}
                 type="number"
                 min="6"
                 max="200"
@@ -766,7 +808,7 @@ export const PresentationWorkspace = forwardRef<
               {(["bold", "italic", "underline"] as const).map((mark, i) => (
                 <button
                   key={mark}
-                  title={["加粗", "斜体", "下划线"][i]}
+                  title={[t("toolbar.bold"), t("toolbar.italic"), t("toolbar.underline")][i]}
                   disabled={disabled}
                   className={marks?.[mark] ? "active" : ""}
                   onMouseDown={(e) => e.preventDefault()}
@@ -776,7 +818,7 @@ export const PresentationWorkspace = forwardRef<
                 </button>
               ))}
               <input
-                aria-label="文字颜色"
+                aria-label={t("toolbar.textColor")}
                 type="color"
                 value={marks?.color ?? "#202124"}
                 disabled={disabled}
@@ -788,7 +830,7 @@ export const PresentationWorkspace = forwardRef<
                 disabled={disabled || !selected.length}
                 onClick={() => select(controller.duplicate(slideId, selected))}
               >
-                复制元素
+                {t("toolbar.duplicateElement")}
               </button>
               <button
                 disabled={disabled || !selected.length}
@@ -797,12 +839,12 @@ export const PresentationWorkspace = forwardRef<
                   select([]);
                 }}
               >
-                删除
+                {t("toolbar.delete")}
               </button>
             </div>
           </div>
         ) : null}
-        {tab === "插入" ? (
+        {tab === "insert" ? (
           <>
             <button
               className="eppt-insert-tool"
@@ -810,13 +852,20 @@ export const PresentationWorkspace = forwardRef<
               onClick={() => add("text")}
             >
               <ToolIcon kind="text" />
-              <span>文本</span>
+              <span>{t("toolbar.text")}</span>
             </button>
             <InsertPalette
               kind="shape"
-              label="图形"
+              label={t("insert.shape")}
               disabled={disabled}
-              items={[...SHAPES, { id: "line", label: "直线", group: "线条" }]}
+              items={[
+                ...SHAPES.map((shape) => ({
+                  id: shape.id,
+                  label: t(`shape.${shape.id}`),
+                  group: shape.group,
+                })),
+                { id: "line", label: t("shape.line"), group: "线条" },
+              ]}
               onPick={(kind) =>
                 add(kind as Parameters<EditorController["add"]>[1])
               }
@@ -827,21 +876,21 @@ export const PresentationWorkspace = forwardRef<
               onClick={() => imageInput.current?.click()}
             >
               <ToolIcon kind="image" />
-              <span>图片</span>
+              <span>{t("toolbar.image")}</span>
             </button>
             <InsertPalette
               kind="chart"
-              label="图表"
+              label={t("insert.chart")}
               disabled={disabled}
               items={[
-                { id: "bar", label: "柱状图" },
-                { id: "bar-stacked", label: "堆积柱状图" },
-                { id: "bar-percent", label: "百分比堆积图" },
-                { id: "line", label: "折线图", icon: "chartLine" },
-                { id: "line-smooth", label: "平滑折线图" },
-                { id: "line-step", label: "阶梯折线图" },
-                { id: "pie", label: "饼图" },
-                { id: "doughnut", label: "环形图" },
+                { id: "bar", label: t("chart.bar") },
+                { id: "bar-stacked", label: t("chart.barStacked") },
+                { id: "bar-percent", label: t("chart.barPercent") },
+                { id: "line", label: t("chart.line"), icon: "chartLine" },
+                { id: "line-smooth", label: t("chart.lineSmooth") },
+                { id: "line-step", label: t("chart.lineStep") },
+                { id: "pie", label: t("chart.pie") },
+                { id: "doughnut", label: t("chart.doughnut") },
               ]}
               onPick={(chartType) => {
                 let id = "";
@@ -861,12 +910,12 @@ export const PresentationWorkspace = forwardRef<
                             stacking: variant,
                             series: [
                               {
-                                name: "系列 1",
+                                name: t("chart.seriesDefault", { index: 1 }),
                                 values: [32, 54, 46, 78],
                                 color: "#527eff",
                               },
                               {
-                                name: "系列 2",
+                                name: t("chart.seriesDefault", { index: 2 }),
                                 values: [48, 36, 62, 52],
                                 color: "#ff8a24",
                               },
@@ -888,7 +937,7 @@ export const PresentationWorkspace = forwardRef<
               }}
             >
               <ToolIcon kind="table" />
-              <span>表格</span>
+              <span>{t("toolbar.table")}</span>
             </button>
             <button
               className="eppt-insert-tool"
@@ -896,29 +945,29 @@ export const PresentationWorkspace = forwardRef<
               onClick={() => setShowProperties(!showProperties)}
             >
               <ToolIcon kind="format" />
-              <span>格式</span>
+              <span>{t("toolbar.format")}</span>
             </button>
-            <button className="eppt-insert-tool" onClick={() => setTab("动画")}>
+            <button className="eppt-insert-tool" onClick={() => setTab("animation")}>
               <ToolIcon kind="animation" />
-              <span>动画</span>
+              <span>{t("toolbar.animation")}</span>
             </button>
           </>
         ) : null}
-        {props.chrome !== "demo" || tab === "设计" ? (
-          <div className={props.chrome !== "demo" ? "eppt-design-actions" : "eppt-toolbar-inline"} role="group" aria-label="页面设置">
+        {props.chrome !== "demo" || tab === "design" ? (
+          <div className={props.chrome !== "demo" ? "eppt-design-actions" : "eppt-toolbar-inline"} role="group" aria-label={t("toolbar.pageSettings")}>
             {props.chrome === "demo" && <label>
               <input
                 type="checkbox"
                 checked={snapping}
                 onChange={(e) => setSnapping(e.target.checked)}
               />{" "}
-              对齐吸附与等距参考线
+              {t("toolbar.snap")}
             </label>}
-            <label title="页面背景">
-              页面背景{" "}
+            <label title={t("toolbar.pageBackground")}>
+              {t("toolbar.pageBackground")}{" "}
               <input
                 type="color"
-                aria-label="页面背景"
+                aria-label={t("toolbar.pageBackground")}
                 value={slide?.background ?? "#ffffff"}
                 disabled={disabled || !slide}
                 onChange={(e) =>
@@ -930,10 +979,10 @@ export const PresentationWorkspace = forwardRef<
                 }
               />
             </label>
-            <label title="页面尺寸；改变尺寸保留元素原位置，可撤销">
-              页面尺寸{" "}
+            <label title={t("toolbar.pageSizeHint")}>
+              {t("toolbar.pageSize")}{" "}
               <select
-                aria-label="页面尺寸"
+                aria-label={t("toolbar.pageSize")}
                 disabled={disabled}
                 value={
                   size.width === 1280 && size.height === 720
@@ -948,24 +997,24 @@ export const PresentationWorkspace = forwardRef<
                     controller.pageSize(960, 720);
                 }}
               >
-                <option value="wide">宽屏 16:9</option>
-                <option value="standard">标准 4:3</option>
+                <option value="wide">{t("toolbar.sizeWide")}</option>
+                <option value="standard">{t("toolbar.sizeStandard")}</option>
                 <option value="custom" disabled>
-                  自定义
+                  {t("toolbar.sizeCustom")}
                 </option>
               </select>
             </label>
             {props.chrome === "demo" && <span className="eppt-muted">
-              改变画布尺寸保留元素原位置，可撤销。
+              {t("toolbar.sizeNote")}
             </span>}
           </div>
         ) : null}
-        {tab === "动画" ? (
+        {tab === "animation" ? (
           <>
             <label>
-              入场效果{" "}
+              {t("toolbar.entrance")}{" "}
               <select
-                aria-label="入场效果"
+                aria-label={t("toolbar.entrance")}
                 disabled={disabled || !element}
                 value={element?.animation?.effect ?? "none"}
                 onChange={(e) =>
@@ -982,21 +1031,21 @@ export const PresentationWorkspace = forwardRef<
                   })
                 }
               >
-                <option value="none">无动画</option>
-                <option value="appear">出现</option>
-                <option value="fade">淡入</option>
-                <option value="fly">飞入</option>
+                <option value="none">{t("toolbar.animNone")}</option>
+                <option value="appear">{t("toolbar.animAppear")}</option>
+                <option value="fade">{t("toolbar.animFade")}</option>
+                <option value="fly">{t("toolbar.animFly")}</option>
               </select>
             </label>
             <span className="eppt-muted">
-              放映时单击逐个播放；当前动画仅用于网页放映。
+              {t("toolbar.animHint")}
             </span>
             {element?.animation ? (
               <>
                 <label>
-                  开始{" "}
+                  {t("toolbar.animStart")}{" "}
                   <select
-                    aria-label="动画开始方式"
+                    aria-label={t("toolbar.animTrigger")}
                     disabled={disabled}
                     value={element.animation.trigger}
                     onChange={(e) =>
@@ -1005,14 +1054,14 @@ export const PresentationWorkspace = forwardRef<
                       })
                     }
                   >
-                    <option value="on-click">单击时</option>
-                    <option value="after-previous">上一动画之后</option>
+                    <option value="on-click">{t("toolbar.onClick")}</option>
+                    <option value="after-previous">{t("toolbar.afterPrevious")}</option>
                   </select>
                 </label>
                 <label>
-                  时长（秒）
+                  {t("toolbar.duration")}
                   <input
-                    aria-label="动画时长"
+                    aria-label={t("toolbar.durationLabel")}
                     type="number"
                     min="0.1"
                     max="10"
@@ -1032,29 +1081,29 @@ export const PresentationWorkspace = forwardRef<
             ) : null}
           </>
         ) : null}
-        {tab === "文件" ? (
+        {tab === "file" ? (
           <>
             <button
               disabled={disabled || !props.onImport}
               onClick={() => setImportOpen(true)}
             >
-              从 PPTX 文件导入
+              {t("toolbar.importPptx")}
             </button>
             <button disabled={busy || !props.onExport} onClick={downloadPptx}>
-              另存为 PPTX
+              {t("toolbar.savePptx")}
             </button>
             <button
               disabled={!props.onExport}
               onClick={() => runAsync(() => props.onExport?.("pdf"))}
             >
-              打印 / 存为 PDF
+              {t("toolbar.printPdf")}
             </button>
             <span className="eppt-muted">
-              导入会打开新文档，原协作文档保留。
+              {t("toolbar.importNote")}
             </span>
           </>
         ) : null}
-        {tab === "文件" ? (
+        {tab === "file" ? (
           <button
             disabled={busy || !props.onExportPng}
             onClick={() =>
@@ -1062,19 +1111,20 @@ export const PresentationWorkspace = forwardRef<
                 if (textEditor && YjsEditor.isYjsEditor(textEditor))
                   YjsEditor.flushLocalChanges(textEditor);
                 const blob = await editorHandle.current?.exportPng();
-                if (!blob) throw new Error("当前幻灯片尚未就绪");
+                if (!blob) throw new Error(t("error.slideNotReady"));
                 await props.onExportPng?.({
                   blob,
                   filename: value.title + ".png",
                   mime: "image/png",
                 });
-                setMessage(
-                  `PNG 已生成（${Math.ceil(blob.size / 1024)} KB），请查看浏览器下载。`,
-                );
+                setMessage({
+                  key: "alert.pngReady",
+                  vars: { size: Math.ceil(blob.size / 1024) },
+                });
               })
             }
           >
-            当前页 PNG
+            {t("toolbar.currentPng")}
           </button>
         ) : null}
         <div className="eppt-zoom-control">
@@ -1082,13 +1132,13 @@ export const PresentationWorkspace = forwardRef<
             −
           </button>
           <select
-            aria-label="缩放"
+            aria-label={t("toolbar.zoom")}
             value={zoom}
             onChange={(e) =>
               setZoom(e.target.value === "fit" ? "fit" : Number(e.target.value))
             }
           >
-            <option value="fit">{Math.round(scale * 100)}% · 适应</option>
+            <option value="fit">{t("toolbar.zoomFit", { percent: Math.round(scale * 100) })}</option>
             {typeof zoom === "number" &&
             ![0.25, 0.5, 0.75, 1, 1.5, 2].includes(zoom) ? (
               <option value={zoom}>{Math.round(zoom * 100)}%</option>
@@ -1123,8 +1173,8 @@ export const PresentationWorkspace = forwardRef<
       )}
       {message ? (
         <div className="eppt-alert" role="alert">
-          {message}
-          <button onClick={() => setMessage("")}>关闭</button>
+          {phraseText(t, message)}
+          <button onClick={() => setMessage(null)}>{t("alert.close")}</button>
         </div>
       ) : null}
       <div className="eppt-body">
@@ -1153,7 +1203,7 @@ export const PresentationWorkspace = forwardRef<
               props.renderCommentAction &&
               !presenting &&
               (props.readOnly ||
-                (element?.type !== "table" && tab !== "插入")) && (
+                (element?.type !== "table" && tab !== "insert")) && (
                 <FloatingToolbar
                   frame={stageFrame}
                   viewport={viewport}
@@ -1177,14 +1227,14 @@ export const PresentationWorkspace = forwardRef<
                     .map((id) => slide?.elements[id])
                     .filter((el): el is SlideElement => !!el)}
                   scale={scale}
-                  hidden={tab !== "插入" || presenting}
+                  hidden={tab !== "insert" || presenting}
                   interacting={canvasInteracting}
                   getTransform={(id) => editorHandle.current?.getElementTransform?.(id)}
                 >
                   {element?.type === "text" ? (
                     <>
                       <select
-                        aria-label="快捷字体"
+                        aria-label={t("float.font")}
                         value={marks?.fontFamily ?? "Arial"}
                         onChange={(e) => format({ fontFamily: e.target.value })}
                         disabled={disabled}
@@ -1196,7 +1246,7 @@ export const PresentationWorkspace = forwardRef<
                         )}
                       </select>
                       <CommitInput
-                        aria-label="快捷字号"
+                        aria-label={t("float.size")}
                         type="number"
                         min="6"
                         max="200"
@@ -1211,7 +1261,7 @@ export const PresentationWorkspace = forwardRef<
                         (mark, i) => (
                           <button
                             key={mark}
-                            aria-label={["加粗", "斜体", "下划线"][i]}
+                            aria-label={[t("toolbar.bold"), t("toolbar.italic"), t("toolbar.underline")][i]}
                             aria-pressed={!!marks?.[mark]}
                             className={marks?.[mark] ? "active" : ""}
                             disabled={disabled}
@@ -1223,13 +1273,13 @@ export const PresentationWorkspace = forwardRef<
                         ),
                       )}
                       <ColorPicker
-                        label="文字颜色"
+                        label={t("toolbar.textColor")} mark="text"
                         value={marks?.color ?? element.fill ?? "#202124"}
                         disabled={disabled}
                         onChange={(color) => format({ color })}
                       />
                       <ColorPicker
-                        label="文字高亮"
+                        label={t("color.highlight")} mark="highlight"
                         value={marks?.backgroundColor}
                         clearable
                         disabled={disabled}
@@ -1240,7 +1290,7 @@ export const PresentationWorkspace = forwardRef<
                         }
                       />
                       <ColorPicker
-                        label="文本框背景"
+                        label={t("color.textBackground")}
                         value={element.background}
                         clearable
                         disabled={disabled}
@@ -1249,7 +1299,7 @@ export const PresentationWorkspace = forwardRef<
                         }
                       />
                       <select
-                        aria-label="快捷段落对齐"
+                        aria-label={t("float.align")}
                         disabled={disabled}
                         value={element.paragraphs[0]?.align ?? "left"}
                         onChange={(e) =>
@@ -1259,9 +1309,9 @@ export const PresentationWorkspace = forwardRef<
                           })
                         }
                       >
-                        <option value="left">左对齐</option>
-                        <option value="center">居中</option>
-                        <option value="right">右对齐</option>
+                        <option value="left">{t("float.alignLeft")}</option>
+                        <option value="center">{t("float.alignCenter")}</option>
+                        <option value="right">{t("float.alignRight")}</option>
                       </select>
                     </>
                   ) : element?.type === "image" ? (
@@ -1270,7 +1320,7 @@ export const PresentationWorkspace = forwardRef<
                         disabled={disabled || !props.resources}
                         onClick={() => setCropping({ slideId, id: element.id })}
                       >
-                        裁剪图片
+                        {t("float.crop")}
                       </button>
                       <button
                         disabled={disabled}
@@ -1280,31 +1330,31 @@ export const PresentationWorkspace = forwardRef<
                           })
                         }
                       >
-                        水平翻转
+                        {t("float.flipH")}
                       </button>
                     </>
                   ) : (
                     <span>
                       {selected.length > 1
-                        ? `已选择 ${selected.length} 个对象`
+                        ? t("selection.count", { count: selected.length })
                         : element?.type === "chart"
-                          ? "图表"
-                          : "形状与对象"}
+                          ? t("float.chart")
+                          : t("float.shape")}
                     </span>
                   )}
                   <button
                     aria-pressed={showProperties}
                     onClick={() => setShowProperties(!showProperties)}
                   >
-                    {showProperties ? "收起格式" : "更多格式"}
+                    {showProperties ? t("float.less") : t("float.more")}
                   </button>
                   {commentAnchor && props.renderCommentAction?.(commentAnchor)}
                 </FloatingToolbar>
               )}
             <span className="eppt-slide-label">
               {slide
-                ? `幻灯片 ${value.slideOrder.indexOf(slideId) + 1}`
-                : "空演示文稿"}{" "}
+                ? t("canvas.slide", { index: value.slideOrder.indexOf(slideId) + 1 })
+                : t("canvas.emptyDeck")}{" "}
               <span>
                 {Math.round(size.width)} × {Math.round(size.height)}
               </span>
@@ -1342,7 +1392,7 @@ export const PresentationWorkspace = forwardRef<
                       setTextEditor(e);
                       refreshFormat((n) => n + 1);
                     }}
-                    onError={(e) => setMessage(e.message)}
+                    onError={(e) => setMessage(noticeFromError(e))}
                     onInteractionChange={setCanvasInteracting}
                     viewScale={scale}
                     snapping={snapping}
@@ -1416,13 +1466,13 @@ export const PresentationWorkspace = forwardRef<
               </div>
             ) : (
               <div className="eppt-empty">
-                <h2>从第一张幻灯片开始</h2>
+                <h2>{t("canvas.startTitle")}</h2>
                 <button
                   className="eppt-primary"
                   disabled={disabled}
                   onClick={() => switchSlide(controller.addSlide())}
                 >
-                  新建幻灯片
+                  {t("canvas.start")}
                 </button>
               </div>
             )}
@@ -1435,7 +1485,7 @@ export const PresentationWorkspace = forwardRef<
             <div
               className="eppt-notes-resize"
               role="separator"
-              aria-label="调整备注区域高度"
+              aria-label={t("canvas.notesResize")}
               aria-orientation="horizontal"
               aria-valuemin={48}
               aria-valuemax={240}
@@ -1473,25 +1523,25 @@ export const PresentationWorkspace = forwardRef<
               <span />
             </div>
             <label className="eppt-sr-only" htmlFor="eppt-notes">
-              演讲者备注
+              {t("canvas.notes")}
             </label>
             <textarea
               id="eppt-notes"
-              aria-label="演讲者备注"
+              aria-label={t("canvas.notes")}
               value={slide?.notes ?? ""}
               disabled={disabled || !slide}
               onChange={(e) =>
                 controller.slideProperty(slideId, "notes", e.target.value)
               }
-              placeholder="点击添加演示者备注"
+              placeholder={t("canvas.notesPlaceholder")}
             />
           </div>
         </main>
         <aside className="eppt-properties" hidden={!showProperties}>
           <div className="eppt-aside-heading">
-            {element ? "元素属性" : "画布与图层"}
+            {element ? t("props.element") : t("props.canvas")}
             <button
-              aria-label="收起属性面板"
+              aria-label={t("props.collapse")}
               onClick={() => setShowProperties(false)}
             >
               ×
@@ -1500,18 +1550,16 @@ export const PresentationWorkspace = forwardRef<
           {element ? (
             <>
               <div className="eppt-prop-title">
-                {
-                  (
-                    {
-                      text: "文本框",
-                      shape: "形状",
-                      image: "图片",
-                      line: "线条",
-                      table: "表格",
-                      chart: "图表",
-                    } as const
-                  )[element.type]
-                }
+                {(
+                  {
+                    text: t("props.text"),
+                    shape: t("props.shape"),
+                    image: t("props.image"),
+                    line: t("props.line"),
+                    table: t("props.table"),
+                    chart: t("props.chart"),
+                  } as const
+                )[element.type]}
               </div>
               {element.type === "chart" && (
                 <ChartDataEditor
@@ -1542,10 +1590,22 @@ export const PresentationWorkspace = forwardRef<
                 {(["x", "y", "width", "height", "rotation"] as const).map(
                   (k, i) => (
                     <label key={k}>
-                      {["X", "Y", "宽度", "高度", "旋转 °"][i]}
+                      {[
+                        t("props.x"),
+                        t("props.y"),
+                        t("props.width"),
+                        t("props.height"),
+                        t("props.rotation"),
+                      ][i]}
                       <CommitInput
                         aria-label={
-                          ["X坐标", "Y坐标", "宽度", "高度", "旋转"][i]
+                          [
+                            t("props.xLabel"),
+                            t("props.yLabel"),
+                            t("props.widthLabel"),
+                            t("props.heightLabel"),
+                            t("props.rotationLabel"),
+                          ][i]
                         }
                         type="number"
                         disabled={disabled || element.locked}
@@ -1578,9 +1638,9 @@ export const PresentationWorkspace = forwardRef<
               </div>
               {element.type === "shape" ? (
                 <label className="eppt-field">
-                  填充颜色
+                  {t("props.fill")}
                   <input
-                    aria-label="填充颜色"
+                    aria-label={t("props.fill")}
                     type="color"
                     value={element.fill ?? "#325af0"}
                     disabled={disabled}
@@ -1594,12 +1654,12 @@ export const PresentationWorkspace = forwardRef<
               ) : null}
               {element.type === "image" ? (
                 <>
-                  <div className="eppt-prop-title">图片</div>
+                  <div className="eppt-prop-title">{t("props.imageTitle")}</div>
                   <button
                     disabled={disabled || !props.resources}
                     onClick={() => setCropping({ slideId, id: element.id })}
                   >
-                    裁剪图片
+                    {t("float.crop")}
                   </button>
                   <button
                     disabled={disabled || !element.crop}
@@ -1609,7 +1669,7 @@ export const PresentationWorkspace = forwardRef<
                       })
                     }
                   >
-                    重置裁剪
+                    {t("props.resetCrop")}
                   </button>
                   <div className="eppt-align">
                     <button
@@ -1621,7 +1681,7 @@ export const PresentationWorkspace = forwardRef<
                         })
                       }
                     >
-                      水平翻转
+                      {t("float.flipH")}
                     </button>
                     <button
                       disabled={disabled}
@@ -1632,7 +1692,7 @@ export const PresentationWorkspace = forwardRef<
                         })
                       }
                     >
-                      垂直翻转
+                      {t("props.flipV")}
                     </button>
                   </div>
                 </>
@@ -1641,7 +1701,7 @@ export const PresentationWorkspace = forwardRef<
                 <label className="eppt-field">
                   <input
                     type="checkbox"
-                    aria-label="末端箭头"
+                    aria-label={t("props.arrow")}
                     disabled={disabled}
                     checked={element.arrow ?? false}
                     onChange={(e) =>
@@ -1650,13 +1710,13 @@ export const PresentationWorkspace = forwardRef<
                       })
                     }
                   />
-                  末端箭头
+                  {t("props.arrow")}
                 </label>
               ) : null}
               <label className="eppt-field">
-                透明度
+                {t("props.opacity")}
                 <input
-                  aria-label="不透明度"
+                  aria-label={t("props.opacityLabel")}
                   type="range"
                   min="0"
                   max="100"
@@ -1680,9 +1740,9 @@ export const PresentationWorkspace = forwardRef<
                     })
                   }
                 />
-                锁定位置
+                {t("props.lock")}
               </label>
-              <div className="eppt-prop-title">对齐到幻灯片</div>
+              <div className="eppt-prop-title">{t("props.alignTitle")}</div>
               {element.type === "text" ? (
                 <>
                   <TextFormatPanel element={element} marks={marks}
@@ -1690,9 +1750,9 @@ export const PresentationWorkspace = forwardRef<
                     disabled={disabled || !!element.locked} format={format} paragraphFormat={paragraphFormat}
                     setPadding={padding => controller.patch(slideId, element.id, { padding })} />
                   <label className="eppt-field">
-                    垂直对齐
+                    {t("props.vertical")}
                     <select
-                      aria-label="文字垂直对齐"
+                      aria-label={t("props.verticalLabel")}
                       disabled={disabled}
                       value={element.verticalAlign ?? "top"}
                       onChange={(e) =>
@@ -1701,12 +1761,12 @@ export const PresentationWorkspace = forwardRef<
                         })
                       }
                     >
-                      <option value="top">顶端</option>
-                      <option value="middle">中部</option>
-                      <option value="bottom">底端</option>
+                      <option value="top">{t("props.top")}</option>
+                      <option value="middle">{t("props.middle")}</option>
+                      <option value="bottom">{t("props.bottom")}</option>
                     </select>
                   </label>
-                  <div className="eppt-prop-title">段落</div>
+                  <div className="eppt-prop-title">{t("props.paragraph")}</div>
                   <div className="eppt-align">
                     {(["left", "center", "right", "justify"] as const).map(
                       (align, i) => (
@@ -1716,7 +1776,7 @@ export const PresentationWorkspace = forwardRef<
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => paragraphFormat({ align })}
                         >
-                          {["左对齐", "居中", "右对齐", "两端"][i]}
+                          {[t("float.alignLeft"), t("float.alignCenter"), t("float.alignRight"), t("props.justify")][i]}
                         </button>
                       ),
                     )}
@@ -1725,23 +1785,23 @@ export const PresentationWorkspace = forwardRef<
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => paragraphFormat({ bullet: true, list: "bullet" })}
                     >
-                      项目符号
+                      {t("props.bullet")}
                     </button>
                     <button
                       disabled={disabled}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => paragraphFormat({ bullet: false, list: "none" })}
                     >
-                      清除列表
+                      {t("props.clearList")}
                     </button>
                   </div>
                 </>
               ) : null}
               {element.type === "chart" ? (
                 <label className="eppt-field">
-                  图表类型
+                  {t("chart.type")}
                   <select
-                    aria-label="图表类型"
+                    aria-label={t("chart.type")}
                     value={element.chartType}
                     disabled={disabled}
                     onChange={(e) => {
@@ -1750,9 +1810,7 @@ export const PresentationWorkspace = forwardRef<
                         (element.values.some((v) => v < 0) ||
                           !element.values.some((v) => v > 0))
                       ) {
-                        setMessage(
-                          "当前数据包含负数或全为零，不能切换为饼图或环形图",
-                        );
+                        setMessage({ key: "alert.pieBlocked" });
                         return;
                       }
                       controller.patch(slideId, element.id, {
@@ -1760,19 +1818,19 @@ export const PresentationWorkspace = forwardRef<
                       });
                     }}
                   >
-                    <option value="bar">柱状图</option>
-                    <option value="line">折线图</option>
+                    <option value="bar">{t("chart.bar")}</option>
+                    <option value="line">{t("chart.line")}</option>
                     <option
                       value="pie"
                       disabled={(element.series?.length ?? 1) > 1}
                     >
-                      饼图（单系列）
+                      {t("chart.pieSingle")}
                     </option>
                     <option
                       value="doughnut"
                       disabled={(element.series?.length ?? 1) > 1}
                     >
-                      环形图（单系列）
+                      {t("chart.doughnutSingle")}
                     </option>
                   </select>
                 </label>
@@ -1780,10 +1838,10 @@ export const PresentationWorkspace = forwardRef<
               {element.type === "shape" || element.type === "line" ? (
                 <>
                   <label className="eppt-field">
-                    边框颜色
+                    {t("props.borderColor")}
                     <input
                       type="color"
-                      aria-label="边框颜色"
+                      aria-label={t("props.borderColor")}
                       value={element.stroke ?? "#325af0"}
                       disabled={disabled}
                       onChange={(e) =>
@@ -1794,10 +1852,10 @@ export const PresentationWorkspace = forwardRef<
                     />
                   </label>
                   <label className="eppt-field">
-                    边框宽度
+                    {t("props.borderWidth")}
                     <input
                       type="number"
-                      aria-label="边框宽度"
+                      aria-label={t("props.borderWidth")}
                       value={element.strokeWidth ?? 0}
                       min="0"
                       max="40"
@@ -1829,28 +1887,28 @@ export const PresentationWorkspace = forwardRef<
                     disabled={disabled}
                     onClick={() => controller.align(slideId, selected, a)}
                   >
-                    {["左", "中", "右", "顶", "居中", "底"][i]}
+                    {[t("props.alignLeft"), t("props.alignCenter"), t("props.alignRight"), t("props.alignTop"), t("props.alignMiddle"), t("props.alignBottom")][i]}
                   </button>
                 ))}
               </div>
               {element.type === "table" && (
                 <p className="eppt-hint">
-                  点击画布单元格编辑；表格右边和下方的 ＋ 可直接增加行列。
+                  {t("table.hint")}
                 </p>
               )}
             </>
           ) : (
             <div className="eppt-hint">
-              选择元素调整位置和样式。
+              {t("props.hintSelect")}
               <br />
-              双击文本进入编辑。
+              {t("props.hintEdit")}
               <br />
-              按住 Shift 可选择多个元素。
+              {t("props.hintShift")}
             </div>
           )}
           {selected.length > 1 ? (
             <>
-              <div className="eppt-prop-title">多选排列</div>
+              <div className="eppt-prop-title">{t("props.multi")}</div>
               <div className="eppt-align">
                 {(
                   [
@@ -1867,7 +1925,7 @@ export const PresentationWorkspace = forwardRef<
                     disabled={disabled}
                     onClick={() => controller.align(slideId, selected, axis)}
                   >
-                    {["左", "中", "右", "顶", "居中", "底"][i]}
+                    {[t("props.alignLeft"), t("props.alignCenter"), t("props.alignRight"), t("props.alignTop"), t("props.alignMiddle"), t("props.alignBottom")][i]}
                   </button>
                 ))}
                 <button
@@ -1876,7 +1934,7 @@ export const PresentationWorkspace = forwardRef<
                     controller.distribute(slideId, selected, "horizontal")
                   }
                 >
-                  横向分布
+                  {t("props.distributeH")}
                 </button>
                 <button
                   disabled={disabled || selected.length < 3}
@@ -1884,7 +1942,7 @@ export const PresentationWorkspace = forwardRef<
                     controller.distribute(slideId, selected, "vertical")
                   }
                 >
-                  纵向分布
+                  {t("props.distributeV")}
                 </button>
               </div>
             </>
@@ -1894,7 +1952,7 @@ export const PresentationWorkspace = forwardRef<
               disabled={disabled || selected.length < 2}
               onClick={() => controller.group(slideId, selected)}
             >
-              组合
+              {t("props.group")}
             </button>
             <button
               disabled={
@@ -1902,11 +1960,11 @@ export const PresentationWorkspace = forwardRef<
               }
               onClick={() => controller.ungroup(slideId, selected)}
             >
-              取消组合
+              {t("props.ungroup")}
             </button>
           </div>
           <details>
-            <summary>选择窗格</summary>
+            <summary>{t("props.layers")}</summary>
             <div className="eppt-layers">
               {[...(slide?.elementOrder ?? [])].reverse().map((id) => (
                 <button
@@ -1930,13 +1988,14 @@ export const PresentationWorkspace = forwardRef<
                           .join("")
                       : (
                           {
-                            shape: "形状",
-                            image: "图片",
-                            line: "线条",
-                            table: "表格",
-                            chart: "图表",
-                          } as Record<string, string>
-                        )[slide.elements[id].type])}
+                            text: t("props.text"),
+                            shape: t("props.shape"),
+                            image: t("props.image"),
+                            line: t("props.line"),
+                            table: t("props.table"),
+                            chart: t("props.chart"),
+                          }[slide.elements[id].type]
+                        ))}
                   {slide.elements[id].locked ? " 🔒" : ""}
                 </button>
               ))}
@@ -1946,12 +2005,12 @@ export const PresentationWorkspace = forwardRef<
       </div>
       <footer className="eppt-status">
         <span>
-          {selected.length ? `已选择 ${selected.length} 个元素` : "就绪"} ·{" "}
-          {slide?.elementOrder.length ?? 0} 个元素
+          {selected.length ? t("status.selected", { count: selected.length }) : t("status.ready")} ·{" "}
+          {t("status.elementCount", { count: slide?.elementOrder.length ?? 0 })}
         </span>
-        <span>快捷键：⌘/Ctrl Z 撤销 · Delete 删除 · 方向键微调</span>
+        <span>{t("status.shortcuts")}</span>
         <span>
-          {props.readOnly ? "只读" : "编辑"} · {props.status ?? "就绪"}
+          {props.readOnly ? t("status.readonly") : t("status.editing")} · {props.status ?? t("status.ready")}
         </span>
       </footer>
       {contextMenu && (
@@ -1965,24 +2024,24 @@ export const PresentationWorkspace = forwardRef<
           actions={[
             ...(["front", "forward", "backward", "back"] as const).map(
               (action, i) => ({
-                label: ["置于顶层", "上移一层", "下移一层", "置于底层"][i],
+                label: [t("context.front"), t("context.forward"), t("context.backward"), t("context.back")][i],
                 disabled,
                 run: () => controller.arrange(slideId, contextMenu.ids, action),
               }),
             ),
             {
-              label: "复制对象",
+              label: t("context.copy"),
               separator: true,
               disabled,
               run: () => select(controller.duplicate(slideId, contextMenu.ids)),
             },
             {
-              label: "组合",
+              label: t("context.group"),
               disabled: disabled || contextMenu.ids.length < 2,
               run: () => controller.group(slideId, contextMenu.ids),
             },
             {
-              label: "取消组合",
+              label: t("context.ungroup"),
               disabled:
                 disabled ||
                 !contextMenu.ids.some((id) => slide.elements[id]?.groupId),
@@ -1990,8 +2049,8 @@ export const PresentationWorkspace = forwardRef<
             },
             {
               label: contextMenu.ids.every((id) => slide.elements[id]?.locked)
-                ? "解锁对象"
-                : "锁定对象",
+                ? t("context.unlock")
+                : t("context.lock"),
               disabled,
               run: () => {
                 const locked = !contextMenu.ids.every(
@@ -2005,12 +2064,12 @@ export const PresentationWorkspace = forwardRef<
               },
             },
             {
-              label: "设置格式",
+              label: t("context.format"),
               separator: true,
               run: () => setShowProperties(true),
             },
             {
-              label: "删除对象",
+              label: t("context.delete"),
               disabled,
               run: () => {
                 controller.remove(slideId, contextMenu.ids);
@@ -2040,7 +2099,7 @@ export const PresentationWorkspace = forwardRef<
           className="eppt-present"
           role="dialog"
           aria-modal="true"
-          aria-label="幻灯片放映"
+          aria-label={t("present.label")}
           tabIndex={-1}
           ref={presentationRoot}
           onKeyDown={(e) => {
@@ -2100,7 +2159,7 @@ export const PresentationWorkspace = forwardRef<
               setPresenting(false);
             }}
           >
-            退出放映 Esc
+            {t("present.exit")}
           </button>
           <span className="eppt-present-count">
             <button
@@ -2109,7 +2168,7 @@ export const PresentationWorkspace = forwardRef<
                 previousPresentedSlide();
               }}
             >
-              上一页
+              {t("present.prev")}
             </button>
             {showOrder.indexOf(slideId) + 1} / {showOrder.length}
             <button
@@ -2118,7 +2177,7 @@ export const PresentationWorkspace = forwardRef<
                 next();
               }}
             >
-              下一页
+              {t("present.next")}
             </button>
             <button
               onClick={(e) => {
@@ -2126,11 +2185,11 @@ export const PresentationWorkspace = forwardRef<
                 void presentationRoot.current
                   ?.requestFullscreen?.()
                   .catch(() =>
-                    setMessage("当前环境不支持全屏，可继续窗口放映。"),
+                    setMessage({ key: "alert.noFullscreen" }),
                   );
               }}
             >
-              全屏
+              {t("present.fullscreen")}
             </button>
           </span>
         </div>
@@ -2148,5 +2207,6 @@ export const PresentationWorkspace = forwardRef<
           ))}
       </div>
     </div>
+    </I18nProvider>
   );
 });

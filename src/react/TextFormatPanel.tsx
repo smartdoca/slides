@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { TextElement, TextLeaf, TextParagraph } from "../model/types";
 import { safeTextLink } from "../model/text-format";
+import { phraseText, useT, type Phrase } from "../i18n";
 import { CommitInput } from "./CommitInput";
 
 export function TextFormatPanel({
@@ -23,10 +24,11 @@ export function TextFormatPanel({
   setPadding(value: number): void;
 }) {
   const [link, setLink] = useState(marks?.link ?? ""),
-    [error, setError] = useState("");
+    [error, setError] = useState<Phrase | null>(null);
+  const t = useT();
   useEffect(() => {
     setLink(marks?.link ?? "");
-    setError("");
+    setError(null);
   }, [element.id, marks?.link]);
   const number = (
     label: string,
@@ -51,19 +53,23 @@ export function TextFormatPanel({
             parsed <= max
           ) {
             change(parsed);
-            setError("");
-          } else setError(`${label}需为 ${min}–${max}`);
+            setError(null);
+          } else
+            setError({
+              key: "format.range",
+              vars: { label, min, max },
+            });
         }}
       />
     </label>
   );
   return (
-    <section aria-label="高级文字排版">
-      <div className="eppt-prop-title">文字排版</div>
+    <section aria-label={t("format.advanced")}>
+      <div className="eppt-prop-title">{t("format.title")}</div>
       <label className="eppt-field">
-        列表
+        {t("format.list")}
         <select
-          aria-label="列表类型"
+          aria-label={t("format.listType")}
           disabled={disabled}
           value={paragraph.list ?? (paragraph.bullet ? "bullet" : "none")}
           onChange={(e) =>
@@ -73,9 +79,9 @@ export function TextFormatPanel({
             })
           }
         >
-          <option value="none">无列表</option>
-          <option value="bullet">项目符号</option>
-          <option value="number">多级编号</option>
+          <option value="none">{t("format.listNone")}</option>
+          <option value="bullet">{t("format.bullet")}</option>
+          <option value="number">{t("format.number")}</option>
         </select>
       </label>
       <div className="eppt-align">
@@ -88,7 +94,7 @@ export function TextFormatPanel({
             })
           }
         >
-          减少缩进
+          {t("format.outdent")}
         </button>
         <button
           disabled={disabled || (paragraph.indentLevel ?? 0) >= 8}
@@ -99,40 +105,40 @@ export function TextFormatPanel({
             })
           }
         >
-          增加缩进
+          {t("format.indent")}
         </button>
       </div>
-      {number("行距倍数", paragraph.lineHeight ?? 1.2, 0.5, 5, (lineHeight) =>
+      {number(t("format.lineHeight"), paragraph.lineHeight ?? 1.2, 0.5, 5, (lineHeight) =>
         paragraphFormat({ lineHeight }),
       )}
       {number(
-        "段前间距（磅）",
+        t("format.spaceBefore"),
         paragraph.spaceBefore ?? 0,
         0,
         240,
         (spaceBefore) => paragraphFormat({ spaceBefore }),
       )}
       {number(
-        "段后间距（磅）",
+        t("format.spaceAfter"),
         paragraph.spaceAfter ?? 0,
         0,
         240,
         (spaceAfter) => paragraphFormat({ spaceAfter }),
       )}
-      {number("文本内边距（像素）", element.padding ?? 0, 0, 200, setPadding)}
+      {number(t("format.padding"), element.padding ?? 0, 0, 200, setPadding)}
       <label className="eppt-field">
-        上下标
+        {t("format.script")}
         <select
-          aria-label="上下标"
+          aria-label={t("format.script")}
           disabled={disabled}
           value={marks?.script ?? "normal"}
           onChange={(e) =>
             format({ script: e.target.value as TextLeaf["script"] })
           }
         >
-          <option value="normal">正常文字</option>
-          <option value="superscript">上标</option>
-          <option value="subscript">下标</option>
+          <option value="normal">{t("format.normal")}</option>
+          <option value="superscript">{t("format.super")}</option>
+          <option value="subscript">{t("format.sub")}</option>
         </select>
       </label>
       <button
@@ -141,7 +147,7 @@ export function TextFormatPanel({
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => format({ strike: !marks?.strike })}
       >
-        删除线
+        {t("format.strike")}
       </button>
       <form
         className="eppt-text-link"
@@ -150,17 +156,17 @@ export function TextFormatPanel({
           if (disabled) return;
           const url = safeTextLink(link);
           if (!url) {
-            setError("链接仅支持 https、http 或 mailto 完整地址");
+            setError({ key: "format.linkError" });
             return;
           }
           format({ link: url });
-          setError("");
+          setError(null);
         }}
       >
         <label className="eppt-field">
-          超链接
+          {t("format.link")}
           <input
-            aria-label="文字超链接"
+            aria-label={t("format.linkLabel")}
             disabled={disabled}
             value={link}
             placeholder="https://example.com"
@@ -168,7 +174,7 @@ export function TextFormatPanel({
           />
         </label>
         <button disabled={disabled} type="submit">
-          应用链接
+          {t("format.applyLink")}
         </button>{" "}
         <button
           disabled={disabled || !marks?.link}
@@ -178,7 +184,7 @@ export function TextFormatPanel({
             setLink("");
           }}
         >
-          移除链接
+          {t("format.removeLink")}
         </button>
         {marks?.link && safeTextLink(marks.link) && (
           <a
@@ -186,12 +192,12 @@ export function TextFormatPanel({
             target="_blank"
             rel="noopener noreferrer"
           >
-            打开链接
+            {t("format.openLink")}
           </a>
         )}
-        <p className="eppt-muted">选中文字时仅应用到选区；放映时可点击链接。</p>
+        <p className="eppt-muted">{t("format.linkHint")}</p>
       </form>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{phraseText(t, error)}</p>}
     </section>
   );
 }

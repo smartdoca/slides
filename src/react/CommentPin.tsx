@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useT } from "../i18n";
 import { emuToPx, type Transform } from "../model/types";
 import { selectionBounds } from "../model/viewport";
 
@@ -11,6 +12,7 @@ export function CommentPin({ transforms, elementIds, getTransform, interacting, 
   onClick(): void;
   children: ReactNode;
 }) {
+  const t = useT();
   const button = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     let frame = 0;
@@ -27,7 +29,7 @@ export function CommentPin({ transforms, elementIds, getTransform, interacting, 
     if (interacting) frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [transforms, elementIds, getTransform, interacting]);
-  return <button ref={button} aria-label="查看元素评论" className="eppt-comment-marker"
+  return <button ref={button} aria-label={t("editor.comments")} className="eppt-comment-marker"
     style={{ position: "absolute", zIndex: 40, pointerEvents: interacting ? "none" : undefined }}
     onPointerDown={e => e.stopPropagation()} onClick={onClick}>{children}</button>;
 }

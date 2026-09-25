@@ -230,3 +230,36 @@ it("presentation navigation is local and never takes keys from a host input", ()
   c.dispose();
   doc.destroy();
 });
+it("updates interface copy when locale changes and leaves the document mounted", () => {
+  const doc = createYDocument(createPresentation());
+  const writes = vi.fn();
+  doc.on("update", writes);
+  act(() =>
+    root.render(<PresentationWorkspace document={doc} locale="zh" />),
+  );
+  expect(host.querySelector('[aria-label="开始放映"]')).not.toBeNull();
+  expect(host.querySelector(".eppt-workspace")?.getAttribute("lang")).toBe(
+    "zh-CN",
+  );
+  act(() =>
+    root.render(
+      <PresentationWorkspace
+        document={doc}
+        locale="en"
+        messages={{ "toolbar.present": "Play" }}
+      />,
+    ),
+  );
+  expect(host.querySelector('[aria-label="Play"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Undo"]')).not.toBeNull();
+  expect(host.querySelector(".eppt-workspace")?.getAttribute("lang")).toBe(
+    "en",
+  );
+  act(() =>
+    root.render(<PresentationWorkspace document={doc} locale="ja" />),
+  );
+  expect(host.querySelector('[aria-label="Start slideshow"]')).not.toBeNull();
+  expect(counters.mounts).toBe(1);
+  expect(writes).not.toHaveBeenCalled();
+  doc.destroy();
+});

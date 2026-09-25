@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SHAPE_GROUPS, useT } from "../i18n";
 import { isShapeKind, shapePath } from "../model/shapes";
 
 export function ToolIcon({ kind }: { kind: string }) {
@@ -76,6 +77,7 @@ export function InsertPalette({
 }) {
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState("全部");
+  const t = useT();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -118,12 +120,12 @@ export function InsertPalette({
             (kind === "chart" ? "eppt-chart-gallery" : "eppt-shape-gallery")
           }
           role="group"
-          aria-label={label + "选择"}
+          aria-label={t("insert.choose", { label })}
         >
           <h3>
-            {label === "图表" ? "图表" : "形状"}
+            {kind === "chart" ? t("insert.chartTitle") : t("insert.shapeTitle")}
             <span>
-              {label === "图表" ? "插入后可编辑数据" : "基础形状与线条"}
+              {kind === "chart" ? t("insert.chartHint") : t("insert.shapeHint")}
             </span>
           </h3>
           {kind === "shape" && (
@@ -137,7 +139,7 @@ export function InsertPalette({
                   aria-pressed={group === g}
                   onClick={() => setGroup(g!)}
                 >
-                  {g}
+                  {t(SHAPE_GROUPS[g!] ?? g!)}
                 </button>
               ))}
             </div>

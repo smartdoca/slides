@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { displayMessage, useT } from "../i18n";
 import { CommitInput } from "./CommitInput";
 const colors = [
   "#ffffff",
@@ -26,13 +27,16 @@ export function ColorPicker({
   onChange,
   disabled,
   clearable = false,
+  mark = "fill",
 }: {
   label: string;
   value?: string;
   onChange: (value: string | undefined) => void;
   disabled?: boolean;
   clearable?: boolean;
+  mark?: "text" | "highlight" | "fill";
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false),
     [error, setError] = useState("");
   const root = useRef<HTMLDivElement>(null),
@@ -93,7 +97,7 @@ export function ColorPicker({
         onClick={() => setOpen(!open)}
       >
         <span>
-          {label.includes("高亮") ? "▰" : label.includes("文字") ? "A" : "▣"}
+          {mark === "highlight" ? "▰" : mark === "text" ? "A" : "▣"}
         </span>
         <i style={{ background: value ?? "transparent" }} />
         <small>⌄</small>
@@ -102,7 +106,7 @@ export function ColorPicker({
         <div
           className="eppt-color-popover"
           role="group"
-          aria-label={label + "选择"}
+          aria-label={t("color.choose", { label })}
         >
           <strong>{label}</strong>
           <div className="eppt-swatches">
@@ -118,15 +122,15 @@ export function ColorPicker({
             ))}
           </div>
           <label>
-            自定义
+            {t("color.custom")}
             <CommitInput
-              aria-label={label + "色值"}
+              aria-label={t("color.value", { label })}
               value={value ?? ""}
               placeholder="#3366ff"
               onCommit={(s) => {
                 const color = s.startsWith("#") ? s : "#" + s;
                 if (/^#[\da-f]{6}$/i.test(color)) pick(color);
-                else setError("请输入 6 位十六进制颜色");
+                else setError("color.invalid");
               }}
             />
           </label>
@@ -135,10 +139,10 @@ export function ColorPicker({
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => pick(undefined)}
             >
-              无颜色
+              {t("color.none")}
             </button>
           )}
-          {error && <span role="alert">{error}</span>}
+          {error && <span role="alert">{displayMessage(t, error)}</span>}
         </div>
       )}
     </div>

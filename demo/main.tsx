@@ -56,6 +56,10 @@ const resources: PresentationResources = {
   },
 };
 function Demo() {
+  const locale = new URLSearchParams(location.search).get("locale") ?? undefined;
+  useEffect(() => {
+    window.document.documentElement.lang = !locale || locale === "zh" ? "zh-CN" : "en";
+  }, [locale]);
   const [roomName, setRoomName] = useState(
     new URLSearchParams(location.search).get("room") ?? "demo",
   );
@@ -170,6 +174,7 @@ function Demo() {
       {ready ? (
         <PresentationWorkspace
           chrome="demo"
+          locale={locale}
           onTitleChange={(title) => {
             const controller = new EditorController(document);
             controller.title(title);
