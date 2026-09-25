@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { displayMessage, useT } from "../i18n";
 import {
   validatePptxFile,
   type PresentationImportContext,
@@ -20,6 +21,7 @@ export function PptxImportDialog({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [over, setOver] = useState(false);
+  const t = useT();
   useEffect(() => {
     dialog.current?.showModal();
     return () => task.current?.abort();
@@ -56,7 +58,7 @@ export function PptxImportDialog({
       if (!request.signal.aborted) onClose();
     } catch (e) {
       if (!request.signal.aborted)
-        setError(e instanceof Error ? e.message : "上传失败，请重试。");
+        setError(e instanceof Error ? e.message : "import.failed");
     } finally {
       if (!request.signal.aborted) {
         setBusy(false);
@@ -75,14 +77,12 @@ export function PptxImportDialog({
       }}
     >
       <header>
-        <h2 id="eppt-import-title">上传 PPTX</h2>
-        <button aria-label="关闭上传窗口" onClick={cancel}>
+        <h2 id="eppt-import-title">{t("import.title")}</h2>
+        <button aria-label={t("import.close")} onClick={cancel}>
           ×
         </button>
       </header>
-      <p>
-        上传后创建独立文稿，不覆盖当前内容。文字、图形、表格和支持的图表可继续编辑；复杂效果可能简化，并提供兼容性报告。
-      </p>
+      <p>{t("import.intro")}</p>
       <div
         className={"eppt-import-drop " + (over ? "is-over" : "")}
         onDragOver={(e) => {
@@ -94,30 +94,30 @@ export function PptxImportDialog({
           e.preventDefault();
           setOver(false);
           if (e.dataTransfer.files.length > 1) {
-            setError("每次请选择一个 PPTX 文件。");
+            setError("import.oneFile");
             return;
           }
           choose(e.dataTransfer.files[0]);
         }}
       >
         <span aria-hidden="true">↑</span>
-        <strong>{file ? file.name : "将 PPTX 文件拖到这里"}</strong>
+        <strong>{file ? file.name : t("import.drop")}</strong>
         <small>
           {file
             ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
-            : "仅支持 .pptx，最大 30 MB"}
+            : t("import.limit")}
         </small>
         <button
           disabled={busy || disabled}
           onClick={() => input.current?.click()}
         >
-          {file ? "重新选择文件" : "选择 PPTX 文件"}
+          {file ? t("import.rechoose") : t("import.choose")}
         </button>
         <input
           ref={input}
           hidden
           type="file"
-          aria-label="PPTX 文件"
+          aria-label={t("import.file")}
           accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
           onChange={(e) => {
             choose(e.target.files?.[0]);
@@ -127,18 +127,20 @@ export function PptxImportDialog({
       </div>
       {error && (
         <p role="alert" className="eppt-import-error">
-          {error}
+          {displayMessage(t, error)}
         </p>
       )}
-      {busy && <p role="status">正在上传并解析文件，请稍候…</p>}
+      {busy && <p role="status">{t("import.busy")}</p>}
       <footer>
-        <button onClick={cancel}>{busy ? "取消上传" : "取消"}</button>
+        <button onClick={cancel}>
+          {busy ? t("import.cancelUpload") : t("import.cancel")}
+        </button>
         <button
           className="eppt-primary"
           disabled={!file || busy || disabled}
           onClick={() => void submit()}
         >
-          {busy ? "正在导入…" : "上传并打开"}
+          {busy ? t("import.importing") : t("import.open")}
         </button>
       </footer>
     </dialog>

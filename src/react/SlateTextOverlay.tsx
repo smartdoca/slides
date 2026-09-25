@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import { useT } from "../i18n";
 import { createEditor, Editor, Transforms, type Descendant } from "slate";
 import {
   Editable,
@@ -32,6 +33,7 @@ export function SlateTextOverlay({
   verticalAlign?: "top" | "middle" | "bottom";
   padding?: number;
 }) {
+  const t = useT();
   const editor = useMemo(
     () =>
       withYjs(withReact(createEditor()), sharedText, {
@@ -77,7 +79,7 @@ export function SlateTextOverlay({
         }}
       >
         <Editable
-          aria-label="幻灯片文本编辑"
+          aria-label={t("editor.text")}
           autoFocus
           spellCheck={false}
           style={{

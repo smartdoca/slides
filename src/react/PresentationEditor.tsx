@@ -2,11 +2,13 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { createTranslator, I18nProvider, useT } from "../i18n";
 import {
   App,
   Ellipse,
@@ -83,6 +85,8 @@ export interface PresentationEditorProps {
   viewScale?: number;
   snapping?: boolean;
   onContextMenu?: (target: { elementId: string; x: number; y: number }) => void;
+  locale?: string;
+  messages?: Record<string, string>;
 }
 export function usePresentation(document: Y.Doc) {
   const store = presentationStore(document);
@@ -97,6 +101,14 @@ export const PresentationEditor = forwardRef<
   PresentationEditorHandle,
   PresentationEditorProps
 >(function PresentationEditor(props, ref) {
+  const inherited = useT();
+  const t = useMemo(
+    () =>
+      props.locale !== undefined || props.messages
+        ? createTranslator(props.locale, props.messages)
+        : inherited,
+    [props.locale, props.messages, inherited],
+  );
   const { document } = props;
   const value = usePresentation(document);
   const slideId = props.slideId ?? value.slideOrder[0];
@@ -546,9 +558,15 @@ export const PresentationEditor = forwardRef<
   useEffect(() => {
     setEditing(null);
   }, [slideId]);
-  if (!value.size) return <div role="status">正在加载文档…</div>;
+  if (!value.size)
+    return (
+      <I18nProvider value={t}>
+        <div role="status">{t("editor.loading")}</div>
+      </I18nProvider>
+    );
   const controller = props.controller ?? ownedController.current;
   return (
+    <I18nProvider value={t}>
     <div
       className="eppt-slide"
       onContextMenu={(e) => {
@@ -674,7 +692,7 @@ export const PresentationEditor = forwardRef<
           return (
             <div
               key={id}
-              aria-label="只读选区"
+              aria-label={t("editor.readonlySelection")}
               style={{
                 position: "absolute",
                 pointerEvents: "none",
@@ -691,7 +709,7 @@ export const PresentationEditor = forwardRef<
         })}
       {!!guides.length && (
         <svg
-          aria-label="对齐与等距参考线"
+          aria-label={t("editor.guides")}
           className="eppt-snap-guides"
           width="100%"
           height="100%"
@@ -726,6 +744,7 @@ export const PresentationEditor = forwardRef<
         </svg>
       )}
     </div>
+    </I18nProvider>
   );
 });
 function makeNode(element: SlideElement): UI {

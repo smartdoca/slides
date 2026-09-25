@@ -1,4 +1,10 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  noticeFromError,
+  phraseText,
+  useT,
+  type Phrase,
+} from "../i18n";
 import type { PresentationDocument } from "../model/types";
 import { emuToPx } from "../model/types";
 import type { EditorController } from "../model/controller";
@@ -99,7 +105,7 @@ export function SlideRail({
     try {
       action();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : String(error));
+      setNotice(noticeFromError(error));
     }
   };
   const duplicate = (ids: string[]) =>
@@ -108,7 +114,7 @@ export function SlideRail({
       if (copies.length) {
         setPicked(copies);
         select(copies[0]);
-        setNotice(`已复制 ${copies.length} 页，可撤销`);
+        setNotice({ key: "rail.duplicated", vars: { count: copies.length } });
       }
     });
   const remove = (ids: string[]) => {
@@ -118,7 +124,7 @@ export function SlideRail({
     const next = remaining[Math.min(Math.max(0, index), remaining.length - 1)];
     setPicked(next ? [next] : []);
     if (next) select(next);
-    setNotice(`已删除 ${ids.length} 页，可撤销恢复`);
+    setNotice({ key: "rail.deleted", vars: { count: ids.length } });
   };
   const [thumbnailWidth, setThumbnailWidth] = useState(160);
   useLayoutEffect(() => {
@@ -174,7 +180,8 @@ export function SlideRail({
     popup.style.top = `${Math.max(8, Math.min(r.bottom - 8, window.innerHeight - popup.offsetHeight - 8))}px`;
     popup.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }, [menu]);
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState<Phrase | null>(null);
+  const t = useT();
   const [renaming, setRenaming] = useState<string | null>(null);
   const scrollSpeed = useRef(0);
   const pointerDrag = useRef<{
@@ -287,8 +294,13 @@ export function SlideRail({
       if (sectionId) setFolded((ids) => ids.filter((id) => id !== sectionId));
       setNotice(
         sectionId
-          ? `已移入分节 ${value.sections?.[sectionId] ?? "未命名分节"}，可撤销`
-          : "顺序已调整，可撤销",
+          ? {
+              key: "rail.moved",
+              vars: {
+                name: value.sections?.[sectionId] ?? t("rail.unnamed"),
+              },
+            }
+          : { key: "rail.reordered" },
       );
     });
   };
@@ -296,7 +308,7 @@ export function SlideRail({
     <aside
       ref={pane}
       className={"eppt-slides " + (collapsed ? "is-collapsed" : "")}
-      aria-label="幻灯片列表"
+      aria-label={t("rail.list")}
       onScroll={() => setMenu(null)}
       onKeyDown={(e) => {
         if (
@@ -325,20 +337,20 @@ export function SlideRail({
       }}
     >
       <span className="eppt-sr-only" role="status">
-        {notice}
+        {phraseText(t, notice)}
       </span>
       {!collapsed && (
         <>
-          <div className="eppt-rail-views" role="group" aria-label="页面视图">
+          <div className="eppt-rail-views" role="group" aria-label={t("rail.views")}>
             <button aria-pressed={!outline} onClick={() => setOutline(false)}>
-              幻灯片
+              {t("rail.slides")}
             </button>
             <button aria-pressed={outline} onClick={() => setOutline(true)}>
-              大纲
+              {t("rail.outline")}
             </button>
           </div>
           <p className="eppt-rail-help">
-            已选 {pickedIds.length} 页 · Shift 连选 · ⌘/Ctrl 多选
+            {t("rail.help", { count: pickedIds.length })}
           </p>
         </>
       )}
@@ -347,28 +359,28 @@ export function SlideRail({
           <>
             <button
               className="eppt-insert-tool"
-              title={`复制选中的 ${pickedIds.length} 页 · ⌘/Ctrl D`}
+              title={t("rail.copyTitle", { count: pickedIds.length })}
               disabled={disabled || !pickedIds.length}
               onClick={() => duplicate(pickedIds)}
             >
               <ToolIcon kind="copySlides" />
-              <span>复制所选</span>
+              <span>{t("rail.copy")}</span>
             </button>
             <button
               className="eppt-insert-tool"
-              title="将所选幻灯片建立为新分节"
+              title={t("rail.newSectionTitle")}
               disabled={disabled || !pickedIds.length}
               onClick={() => {
                 onReveal?.();
                 setSectionEditor({
                   anchorId: pickedIds[0],
                   ids: pickedIds,
-                  name: "新分节",
+                  name: t("rail.sectionDefault"),
                 });
               }}
             >
               <ToolIcon kind="section" />
-              <span>新建分节</span>
+              <span>{t("rail.newSection")}</span>
             </button>
           </>,
           toolbarContainer,
@@ -379,7 +391,7 @@ export function SlideRail({
             <form
               ref={sectionFormRef}
               className="eppt-section-form"
-              aria-label="创建分节"
+              aria-label={t("rail.createSection")}
               onSubmit={(e) => {
                 e.preventDefault();
                 if (disabled) return;
@@ -389,14 +401,14 @@ export function SlideRail({
                     sectionEditor.ids,
                   );
                   setSectionEditor(null);
-                  setNotice("分节已创建，可拖入更多幻灯片");
+                  setNotice({ key: "rail.created" });
                 });
               }}
             >
               <label>
-                创建分节
+                {t("rail.createSection")}
                 <input
-                  aria-label="分节名称"
+                  aria-label={t("rail.sectionName")}
                   autoFocus
                   maxLength={200}
                   value={sectionEditor.name}
@@ -413,14 +425,14 @@ export function SlideRail({
               </label>
               <div className="eppt-section-form-actions">
                 <button type="button" onClick={() => setSectionEditor(null)}>
-                  取消
+                  {t("rail.cancel")}
                 </button>
                 <button
                   className="eppt-section-confirm"
                   disabled={disabled || !sectionEditor.name.trim()}
                   type="submit"
                 >
-                  创建
+                  {t("rail.create")}
                 </button>
               </div>
             </form>
@@ -433,7 +445,7 @@ export function SlideRail({
                 id={value.slides[id].sectionId!}
                 startId={id}
                 name={
-                  value.sections?.[value.slides[id].sectionId!] ?? "未命名分节"
+                  value.sections?.[value.slides[id].sectionId!] ?? t("rail.unnamed")
                 }
                 folded={folded.includes(value.slides[id].sectionId!)}
                 disabled={disabled}
@@ -453,7 +465,7 @@ export function SlideRail({
                 onDelete={() =>
                   safely(() => {
                     controller.deleteSection(value.slides[id].sectionId!);
-                    setNotice("分节已删除，幻灯片已保留，可撤销");
+                    setNotice({ key: "rail.sectionDeleted" });
                     focus(id);
                   })
                 }
@@ -495,7 +507,14 @@ export function SlideRail({
                 (pickedIds.includes(id) ? "selected " : "") +
                 (outline ? "is-outline " : "")
               }
-              aria-label={`幻灯片 ${index + 1}${value.slides[id].name ? " · " + value.slides[id].name : ""}`}
+              aria-label={
+                value.slides[id].name
+                  ? t("rail.slideNamed", {
+                      index: index + 1,
+                      name: value.slides[id].name,
+                    })
+                  : t("rail.slide", { index: index + 1 })
+              }
               aria-current={active === id ? "page" : undefined}
               aria-pressed={pickedIds.includes(id)}
               draggable={false}
@@ -580,7 +599,7 @@ export function SlideRail({
                 const direction = e.key === "ArrowUp" ? -1 : 1;
                 if (e.altKey && !disabled && e.key.startsWith("Arrow")) {
                   controller.moveSlide(id, direction);
-                  setNotice("顺序已调整，可撤销");
+                  setNotice({ key: "rail.reordered" });
                 } else {
                   const target =
                     e.key === "Home"
@@ -598,14 +617,14 @@ export function SlideRail({
                   focus(value.slideOrder[target]);
                 }
               }}
-              title="拖动调整顺序 · Alt + ↑ / ↓ 移动 · F2 重命名"
+              title={t("rail.dragHint")}
             >
               {outline ? (
                 <div className="eppt-outline-content">
                   <strong>
                     {value.slides[id].name ??
                       slideOutline(value.slides[id])[0] ??
-                      "空白幻灯片"}
+                      t("rail.blank")}
                   </strong>
                   {slideOutline(value.slides[id])
                     .slice(value.slides[id].name ? 0 : 1)
@@ -640,13 +659,13 @@ export function SlideRail({
                 </div>
               )}
               {value.slides[id].hidden && (
-                <span className="eppt-hidden-badge">放映时跳过</span>
+                <span className="eppt-hidden-badge">{t("rail.hidden")}</span>
               )}
             </button>
             {!collapsed && (
               <button
                 className="eppt-slide-more"
-                aria-label={`第 ${index + 1} 页菜单`}
+                aria-label={t("rail.pageMenu", { index: index + 1 })}
                 aria-expanded={menu === id}
                 onClick={() => {
                   if (!pickedIds.includes(id)) choose(id);
@@ -660,14 +679,17 @@ export function SlideRail({
               <div className="eppt-rename">
                 <CommitInput
                   autoFocus
-                  aria-label="页面名称"
-                  value={value.slides[id].name ?? `幻灯片 ${index + 1}`}
+                  aria-label={t("rail.pageName")}
+                  value={
+                    value.slides[id].name ??
+                    t("rail.slide", { index: index + 1 })
+                  }
                   onBlur={() => setRenaming(null)}
                   onCommit={(name) => {
                     controller.slideProperty(
                       id,
                       "name",
-                      name.trim() || `幻灯片 ${index + 1}`,
+                      name.trim() || t("rail.slide", { index: index + 1 }),
                     );
                     setRenaming(null);
                   }}
@@ -687,7 +709,7 @@ export function SlideRail({
                 ref={menuRef}
                 className="eppt-slide-menu"
                 role="menu"
-                aria-label="页面操作"
+                aria-label={t("rail.pageActions")}
                 onKeyDown={(e) => {
                   if (["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) {
                     e.preventDefault();
@@ -726,9 +748,9 @@ export function SlideRail({
                     setMenu(null);
                   }}
                 >
-                  复制幻灯片
+                  {t("rail.duplicate")}
                   {targets(id).length > 1
-                    ? `（${targets(id).length} 页）`
+                    ? t("rail.pageCount", { count: targets(id).length })
                     : ""}{" "}
                   <kbd>⌘D</kbd>
                 </button>
@@ -740,7 +762,7 @@ export function SlideRail({
                     setMenu(null);
                   }}
                 >
-                  重命名 <kbd>F2</kbd>
+                  {t("rail.rename")} <kbd>F2</kbd>
                 </button>
                 <hr />
                 <button
@@ -755,8 +777,8 @@ export function SlideRail({
                   }}
                 >
                   {targets(id).every((sid) => value.slides[sid].hidden)
-                    ? "取消隐藏"
-                    : "隐藏幻灯片"}
+                    ? t("rail.unhide")
+                    : t("rail.hide")}
                 </button>
                 <button
                   role="menuitem"
@@ -765,17 +787,17 @@ export function SlideRail({
                     setSectionEditor({
                       anchorId: targets(id)[0],
                       ids: targets(id),
-                      name: "新分节",
+                      name: t("rail.sectionDefault"),
                     });
                     setMenu(null);
                   }}
                 >
-                  将所选页新建分节
+                  {t("rail.newSectionFrom")}
                 </button>
                 <label className="eppt-section-assign">
-                  移动到分节
+                  {t("rail.moveTo")}
                   <select
-                    aria-label="移动到分节"
+                    aria-label={t("rail.moveTo")}
                     disabled={disabled}
                     value=""
                     onChange={(e) => {
@@ -787,9 +809,9 @@ export function SlideRail({
                     }}
                   >
                     <option value="" disabled>
-                      选择分节
+                      {t("rail.chooseSection")}
                     </option>
-                    <option value="__none">移出分节</option>
+                    <option value="__none">{t("rail.leaveSection")}</option>
                     {Object.entries(value.sections ?? {}).map(
                       ([sectionId, name]) => (
                         <option key={sectionId} value={sectionId}>
@@ -808,7 +830,7 @@ export function SlideRail({
                     setMenu(null);
                   }}
                 >
-                  移到开头
+                  {t("rail.toStart")}
                 </button>
                 <button
                   role="menuitem"
@@ -818,7 +840,7 @@ export function SlideRail({
                     setMenu(null);
                   }}
                 >
-                  移到末尾
+                  {t("rail.toEnd")}
                 </button>
                 <hr />
                 <button
@@ -828,11 +850,13 @@ export function SlideRail({
                   onClick={() => {
                     remove(targets(id));
                     setMenu(null);
-                    setNotice("幻灯片已删除，可通过撤销恢复");
+                    setNotice({ key: "rail.deletedUndo" });
                   }}
                 >
-                  删除幻灯片
-                  {targets(id).length > 1 ? `（${targets(id).length} 页）` : ""}
+                  {t("rail.delete")}
+                  {targets(id).length > 1
+                    ? t("rail.pageCount", { count: targets(id).length })
+                    : ""}
                 </button>
               </div>
             )}
@@ -845,7 +869,7 @@ export function SlideRail({
           disabled={disabled}
           onClick={() => select(controller.addSlide(active))}
         >
-          ＋ 新建幻灯片
+          {t("rail.add")}
         </button>
       )}
     </aside>

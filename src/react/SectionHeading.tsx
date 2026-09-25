@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { displayMessage, useT } from "../i18n";
 
 /** Local title draft and menu state; only a committed name/deletion is content. */
 export function SectionHeading({
@@ -30,6 +31,7 @@ export function SectionHeading({
     [draft, setDraft] = useState(name),
     [error, setError] = useState("");
   const [open, setOpen] = useState(false);
+  const t = useT();
   const finished = useRef(false);
   const startName = useRef(name);
   const rename = () => {
@@ -44,7 +46,7 @@ export function SectionHeading({
   const commit = () => {
     if (finished.current || disabled) return;
     if (!draft.trim()) {
-      setError("请输入分节名称");
+      setError("section.nameRequired");
       return;
     }
     try {
@@ -114,7 +116,10 @@ export function SectionHeading({
     >
       <button
         className="eppt-section-toggle"
-        aria-label={`${folded ? "展开" : "收起"}分节 ${name}`}
+        aria-label={t("section.toggle", {
+          action: folded ? t("section.expand") : t("section.collapse"),
+          name,
+        })}
         aria-expanded={!folded}
         onClick={onToggle}
       >
@@ -123,9 +128,9 @@ export function SectionHeading({
       {editing ? (
         <input
           className="eppt-section-name-input"
-          aria-label="分节名称"
+          aria-label={t("section.name")}
           aria-invalid={!!error}
-          title={error || "Enter 保存 · Esc 取消"}
+          title={error ? displayMessage(t, error) : t("section.nameHint")}
           autoFocus
           maxLength={200}
           value={draft}
@@ -154,8 +159,8 @@ export function SectionHeading({
         <button
           className="eppt-section-title"
           disabled={disabled}
-          aria-label={`重命名分节 ${name}`}
-          title="点击名称编辑 · 拖动幻灯片到这里移入分节"
+          aria-label={t("section.rename", { name })}
+          title={t("section.renameHint")}
           onClick={rename}
         >
           {name}
@@ -165,7 +170,7 @@ export function SectionHeading({
         ref={trigger}
         className="eppt-section-more"
         disabled={disabled}
-        aria-label={`分节 ${name} 更多操作`}
+        aria-label={t("section.more", { name })}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -174,7 +179,7 @@ export function SectionHeading({
       </button>
       {error && (
         <span role="alert" className="eppt-section-error">
-          {error}
+          {displayMessage(t, error)}
         </span>
       )}
       {open &&
@@ -183,7 +188,7 @@ export function SectionHeading({
             ref={menu}
             className="eppt-section-menu"
             role="menu"
-            aria-label={`分节 ${name} 操作`}
+            aria-label={t("section.menu", { name })}
             onKeyDown={(e) => {
               e.stopPropagation();
               if (e.key === "Escape") {
@@ -209,7 +214,7 @@ export function SectionHeading({
             }}
           >
             <button role="menuitem" disabled={disabled} onClick={rename}>
-              重命名分节
+              {t("section.renameAction")}
             </button>
             <button
               role="menuitem"
@@ -219,7 +224,7 @@ export function SectionHeading({
                 onDelete();
               }}
             >
-              删除分节（保留幻灯片）
+              {t("section.delete")}
             </button>
           </div>,
           root.current?.closest(".eppt-workspace") ?? document.body,

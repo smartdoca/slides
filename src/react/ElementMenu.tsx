@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
+import { useT } from "../i18n";
 export interface ElementMenuAction {
   label: string;
   run: () => void;
@@ -16,6 +17,7 @@ export function ElementMenu({
   actions: ElementMenuAction[];
   onClose: () => void;
 }) {
+  const t = useT();
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = root.current!;
@@ -40,7 +42,7 @@ export function ElementMenu({
     <div
       ref={root}
       role="menu"
-      aria-label="元素操作"
+      aria-label={t("context.menu")}
       className="eppt-element-menu"
       onContextMenu={(e) => e.preventDefault()}
       onKeyDown={(e) => {

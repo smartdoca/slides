@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { displayMessage, useT } from "../i18n";
 import type { ChartElement, ChartSeries } from "../model/types";
 import { chartSeries, CHART_COLORS, validChart } from "../model/chart";
 export function ChartDataEditor({
@@ -23,6 +24,7 @@ export function ChartDataEditor({
     [baseline, setBaseline] = useState(signature),
     [dirty, setDirty] = useState(false),
     [error, setError] = useState("");
+  const t = useT();
   useEffect(() => {
     if (!dirty || disabled) {
       setData(initial());
@@ -43,21 +45,21 @@ export function ChartDataEditor({
     setError("");
   };
   return (
-    <section className="eppt-chart-data" aria-label="图表数据编辑">
-      <h3>图表数据</h3>
-      <p>编辑后应用，支持撤销</p>
+    <section className="eppt-chart-data" aria-label={t("chart.dataTitle")}>
+      <h3>{t("chart.dataHeading")}</h3>
+      <p>{t("chart.dataHint")}</p>
       {dirty && baseline !== signature && (
-        <p role="alert">数据已被协作者修改。请重新载入后再编辑。</p>
+        <p role="alert">{t("chart.remote")}</p>
       )}
       <div className="eppt-chart-sheet">
         <table>
           <thead>
             <tr>
-              <th>分类</th>
+              <th>{t("chart.categoryHeader")}</th>
               {data.series.map((s, j) => (
                 <th key={j}>
                   <input
-                    aria-label={`系列 ${j + 1} 名称`}
+                    aria-label={t("chart.seriesName", { index: j + 1 })}
                     value={s.name}
                     disabled={disabled}
                     onChange={(e) =>
@@ -71,7 +73,7 @@ export function ChartDataEditor({
                   />
                   <input
                     type="color"
-                    aria-label={`系列 ${j + 1} 颜色`}
+                    aria-label={t("chart.seriesColor", { index: j + 1 })}
                     value={s.color}
                     disabled={disabled}
                     onChange={(e) =>
@@ -84,7 +86,7 @@ export function ChartDataEditor({
                     }
                   />
                   <button
-                    aria-label={`移除系列 ${j + 1}`}
+                    aria-label={t("chart.removeSeries", { index: j + 1 })}
                     disabled={disabled || data.series.length === 1}
                     onClick={() =>
                       update({
@@ -105,7 +107,7 @@ export function ChartDataEditor({
               <tr key={i}>
                 <td>
                   <input
-                    aria-label={`第 ${i + 1} 项分类`}
+                    aria-label={t("chart.category", { index: i + 1 })}
                     value={label}
                     disabled={disabled}
                     onChange={(e) =>
@@ -123,8 +125,11 @@ export function ChartDataEditor({
                     <input
                       aria-label={
                         j === 0
-                          ? `第 ${i + 1} 项数值`
-                          : `系列 ${j + 1} 第 ${i + 1} 项数值`
+                          ? t("chart.value", { index: i + 1 })
+                          : t("chart.seriesValue", {
+                              series: j + 1,
+                              index: i + 1,
+                            })
                       }
                       inputMode="decimal"
                       value={s.values[i]}
@@ -149,7 +154,7 @@ export function ChartDataEditor({
                 ))}
                 <td>
                   <button
-                    aria-label={`移除第 ${i + 1} 项`}
+                    aria-label={t("chart.removeRow", { index: i + 1 })}
                     disabled={disabled || data.labels.length === 1}
                     onClick={() =>
                       update({
@@ -169,13 +174,13 @@ export function ChartDataEditor({
           </tbody>
         </table>
       </div>
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert">{displayMessage(t, error)}</p>}
       <div className="eppt-data-grid-actions">
         <button
           disabled={disabled || data.labels.length >= 100}
           onClick={() =>
             update({
-              labels: [...data.labels, `分类 ${data.labels.length + 1}`],
+              labels: [...data.labels, t("chart.categoryDefault", { index: data.labels.length + 1 })],
               series: data.series.map((s) => ({
                 ...s,
                 values: [...s.values, "0"],
@@ -183,7 +188,7 @@ export function ChartDataEditor({
             })
           }
         >
-          ＋ 添加一行
+          {t("chart.addRow")}
         </button>
         <button
           disabled={
@@ -197,7 +202,7 @@ export function ChartDataEditor({
               series: [
                 ...data.series,
                 {
-                  name: `系列 ${data.series.length + 1}`,
+                  name: t("chart.seriesDefault", { index: data.series.length + 1 }),
                   color: CHART_COLORS[data.series.length % CHART_COLORS.length],
                   values: data.labels.map(() => "0"),
                 },
@@ -205,10 +210,10 @@ export function ChartDataEditor({
             })
           }
         >
-          ＋ 添加系列
+          {t("chart.addSeries")}
         </button>
         <button disabled={disabled || !dirty} onClick={reset}>
-          重置
+          {t("chart.reset")}
         </button>
         <button
           className="eppt-primary"
@@ -220,7 +225,7 @@ export function ChartDataEditor({
                 s.values.some((v) => !v.trim() || !Number.isFinite(Number(v))),
               )
             ) {
-              setError("请填写分类和有效数值");
+              setError("chart.invalid");
               return;
             }
             const series = data.series.map((s) => ({
@@ -233,8 +238,8 @@ export function ChartDataEditor({
             if (!validChart({ ...element, labels, values, series })) {
               setError(
                 ["pie", "doughnut"].includes(element.chartType)
-                  ? "饼图和环形图需要非负值，且至少一项大于零"
-                  : "请填写系列名称；百分比堆积需要非负数据且每一分类总值大于零",
+                  ? "chart.pieRule"
+                  : "chart.stackRule",
               );
               return;
             }
@@ -243,7 +248,7 @@ export function ChartDataEditor({
             setError("");
           }}
         >
-          应用数据
+          {t("chart.apply")}
         </button>
       </div>
     </section>

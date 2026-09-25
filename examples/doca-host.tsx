@@ -41,10 +41,12 @@ export function DocaPresentation({
   session,
   resources,
   comments,
+  locale,
 }: {
   session: HostSession;
   resources: HostResources;
   comments: HostComments;
+  locale?: string;
 }) {
   const editor = useRef<PresentationWorkspaceHandle>(null);
   if (!session.ready) return <div role="status">正在同步文稿…</div>;
@@ -77,6 +79,7 @@ export function DocaPresentation({
       <div style={{ flex: 1, minHeight: 0 }}>
         <PresentationWorkspace
           ref={editor}
+          locale={locale}
           document={session.document}
           readOnly={session.readOnly}
           resources={resources}

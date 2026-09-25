@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../i18n";
 import { imageFrame } from "../model/image";
 import type { ImageElement } from "../model/types";
 
@@ -26,6 +27,7 @@ export function ResourceImage({
   onRetry?: () => void;
   interactive?: boolean;
 }) {
+  const t = useT();
   const [attempt, retry] = useState(0),
     [failed, setFailed] = useState<string | null>(null);
   const url = resolveImageUrl(resolveAsset, element.assetId),
@@ -45,7 +47,11 @@ export function ResourceImage({
           fontSize: 14,
         }}
       >
-        <span>{element.alt || "图片"}暂不可用</span>
+        <span>
+          {t("image.unavailable", {
+            name: element.alt || t("image.fallbackName"),
+          })}
+        </span>
         {interactive && <button
           style={{ pointerEvents: "auto" }}
           onClick={(e) => {
@@ -54,7 +60,7 @@ export function ResourceImage({
             onRetry?.();
           }}
         >
-          重试图片
+          {t("image.retry")}
         </button>}
       </div>
     );

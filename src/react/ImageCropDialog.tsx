@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n";
 import type { ImageCrop } from "../model/types";
 import { UNCROPPED } from "../model/image";
 
@@ -17,6 +18,7 @@ export function ImageCropDialog({
   const [ratio, setRatio] = useState(4 / 3);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const dragging = useRef<{
@@ -69,12 +71,12 @@ export function ImageCropDialog({
         ref={panel}
         role="dialog"
         aria-modal="true"
-        aria-label="裁剪图片"
+        aria-label={t("crop.title")}
         tabIndex={-1}
       >
-        <h2>裁剪图片</h2>
-        <p>拖动选区或四角调整，也可输入百分比。原图会保留。</p>
-        {failed ? <p role="alert">图片加载失败，请检查资源访问权限。</p> : null}
+        <h2>{t("crop.title")}</h2>
+        <p>{t("crop.help")}</p>
+        {failed ? <p role="alert">{t("crop.failed")}</p> : null}
         <div
           ref={surface}
           className="eppt-crop-surface"
@@ -131,7 +133,7 @@ export function ImageCropDialog({
         >
           <img
             src={url}
-            alt="裁剪原图预览"
+            alt={t("crop.preview")}
             draggable={false}
             onLoad={(e) => {
               setRatio(
@@ -161,11 +163,18 @@ export function ImageCropDialog({
           </div>
         </div>
         <div className="eppt-field-grid">
-          {["左", "上", "右", "下"].map((label, i) => (
-            <label key={label}>
-              {label}侧裁去（%）
+          {(
+            [
+              t("crop.left"),
+              t("crop.top"),
+              t("crop.right"),
+              t("crop.bottom"),
+            ] as const
+          ).map((label, i) => (
+            <label key={i}>
+              {t("crop.edge", { edge: label })}
               <input
-                aria-label={label + "侧裁去百分比"}
+                aria-label={t("crop.edgeLabel", { edge: label })}
                 type="number"
                 min="0"
                 max={Math.round((0.99 - crop[(i + 2) % 4]) * 1000) / 10}
@@ -177,14 +186,14 @@ export function ImageCropDialog({
           ))}
         </div>
         <div className="eppt-crop-actions">
-          <button onClick={() => setCrop([...UNCROPPED])}>恢复完整图片</button>
-          <button onClick={onClose}>取消</button>
+          <button onClick={() => setCrop([...UNCROPPED])}>{t("crop.reset")}</button>
+          <button onClick={onClose}>{t("crop.cancel")}</button>
           <button
             className="eppt-primary"
             disabled={failed || !loaded}
             onClick={() => onApply(crop)}
           >
-            应用裁剪
+            {t("crop.apply")}
           </button>
         </div>
       </div>

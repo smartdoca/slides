@@ -5,6 +5,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { useT } from "../i18n";
 import { emuToPx, type SlideElement, type Transform } from "../model/types";
 import { floatingPosition, selectionBounds } from "../model/viewport";
 
@@ -28,6 +29,7 @@ export function FloatingToolbar({
   interacting?: boolean;
   getTransform?: (id: string) => Transform | null | undefined;
 }) {
+  const t = useT();
   const toolbar = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{
     left: number;
@@ -91,7 +93,7 @@ export function FloatingToolbar({
       ref={toolbar}
       className="eppt-context-toolbar"
       role="toolbar"
-      aria-label="选中对象工具"
+      aria-label={t("editor.selectionTools")}
       style={{
         left: position.left,
         top: position.top,
