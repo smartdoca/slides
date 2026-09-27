@@ -1,13 +1,14 @@
 {
-  "name": "@eppt/editor",
+  "name": "@smartdoca/slides",
   "version": "0.3.0-alpha.1",
   "description": "Embeddable React presentation editor with Leafer, Slate and Yjs",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "files": [
     "dist",
     "docs",
-    "examples"
+    "examples",
+    "LICENSE"
   ],
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -81,5 +82,12 @@
     "vite": "^7.1.0",
     "vitest": "^3.2.0",
     "ws": "^8.18.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smartdoca/slides.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
