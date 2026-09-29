@@ -4,7 +4,7 @@
 
 可嵌入的 React 协同演示文稿编辑器。画布使用 LeaferJS，文字使用 Slate，文档是 Yjs 结构。宿主负责身份、图片、权限和网络。
 
-许可证为 [AGPL-3.0-only](LICENSE)。0.3.0-alpha.1 是预览版，不是完整的 PowerPoint 兼容。
+许可证为 [MIT](LICENSE)。0.3.0-alpha.2 是预览版，不是完整的 PowerPoint 兼容。
 
 ## 安装
 

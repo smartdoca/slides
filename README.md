@@ -4,7 +4,7 @@
 
 Embeddable collaborative presentation editor for React. The canvas uses LeaferJS, text uses Slate, and the document is a Yjs structure. The host owns identity, images, permissions, and the network.
 
-Licensed under [AGPL-3.0-only](LICENSE). Version 0.3.0-alpha.1 is a preview. It is not full PowerPoint compatibility.
+Licensed under [MIT](LICENSE). Version 0.3.0-alpha.2 is a preview. It is not full PowerPoint compatibility.
 
 ## Install
 
