@@ -1,4 +1,5 @@
 .eppt-workspace {
+  position: relative;
   --accent: #365dea;
   --border: #e6e9ef;
   --muted: #7b8597;
@@ -902,6 +903,16 @@
   padding: 3px 8px;
   font-size: 17px;
 }
+.eppt-zoom-menu > .eppt-format-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0 !important;
+}
+.eppt-zoom-menu > .eppt-format-trigger svg { width: 12px; height: 12px; }
+.eppt-zoom-menu .eppt-format-popover > button { font-size: 13px; }
 .eppt-slides {
   width: 220px;
   padding: 16px 12px 20px;
@@ -1421,72 +1432,6 @@
   border-top: 1px solid #edf0f3;
   margin: 4px;
 }
-.eppt-color-root {
-  position: relative;
-  flex-shrink: 0;
-}
-.eppt-color-trigger {
-  position: relative;
-  min-width: 38px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.eppt-color-trigger i {
-  position: absolute;
-  bottom: 2px;
-  left: 8px;
-  width: 18px;
-  height: 3px;
-  border: 1px solid #cdd3df;
-}
-.eppt-color-trigger small {
-  font-size: 10px;
-  color: #858b98;
-}
-.eppt-color-popover {
-  position: fixed;
-  z-index: 160;
-  width: 240px;
-  padding: 16px;
-  background: white;
-  color: #373b43;
-  border: 1px solid #dfe3e9;
-  box-shadow: 0 6px 24px #1d2b4526;
-  border-radius: 8px;
-  white-space: normal;
-}
-.eppt-swatches {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  margin: 14px 0;
-}
-.eppt-swatches button {
-  width: 26px;
-  min-height: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid #d4d9e0;
-  border-radius: 3px;
-}
-.eppt-swatches button[aria-pressed="true"] {
-  outline: 2px solid #3366ff;
-  outline-offset: 2px;
-}
-.eppt-color-popover label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.eppt-color-popover input {
-  width: 125px;
-}
-.eppt-color-popover [role="alert"] {
-  display: block;
-  color: #b42318;
-  font-size: 12px;
-}
 .eppt-table-overlay {
   position: relative;
   width: 100%;
@@ -1818,3 +1763,159 @@
 .eppt-outline-content strong,.eppt-outline-content span { display:block; }
 .eppt-outline-content span { margin-top:5px; color:#808693; }
 .eppt-thumb.is-outline.selected { box-shadow:0 0 0 2px #5578ff; }
+
+/* Selection formatting follows the reference's compact, contextual workflow. */
+.eppt-workspace { --accent: #3370ff; --border: #dee0e3; --muted: #8f959e; color: #1f2329; background: #f5f6f8; }
+.eppt-stage-frame { margin: 0 auto auto; animation: eppt-format-reveal 140ms ease-out; }
+.eppt-canvas-area { padding-top: 54px; }
+.eppt-insert-actions { display: flex; align-items: center; gap: 5px; margin: 0 auto; flex-shrink: 0; }
+.eppt-context-toolbar { min-height: 44px; padding: 5px 8px; gap: 3px; border-color: #dee0e3; border-radius: 4px; box-shadow: 0 3px 9px #1f232921; }
+.eppt-selection-format { display: flex; align-items: center; gap: 3px; min-width: max-content; }
+.eppt-context-toolbar[data-compact="true"] { padding: 5px; }
+.eppt-context-toolbar[data-compact="true"] .eppt-selection-format { gap: 1px; }
+.eppt-context-toolbar[data-compact="true"] .eppt-preset-menu > button { width: 72px; }
+.eppt-context-toolbar[data-compact="true"] .eppt-font-menu > button { width: 90px; }
+.eppt-context-toolbar[data-compact="true"] .eppt-font-stepper input { width: 32px !important; }
+.eppt-context-toolbar[data-compact="true"] .eppt-font-stepper button { width: 20px; }
+.eppt-context-toolbar[data-compact="true"] .eppt-format-divider { margin: 0 2px; }
+.eppt-context-toolbar[data-narrow="true"] .eppt-selection-format > :is(.eppt-preset-menu, .eppt-font-menu, .eppt-font-stepper, .eppt-format-divider) { display: none; }
+.eppt-context-row { position: relative; }
+.eppt-element-menu { width: 220px; border-radius: 6px; padding: 5px; border-color: #dee0e3; font-size: 13px; }
+.eppt-element-menu .eppt-context-row > button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 7px 10px; font-size: 13px; }
+.eppt-element-menu kbd { color: #8f959e; font-size: 12px; font-family: inherit; }
+.eppt-context-submenu { position: absolute; top: 0; left: 100%; width: 192px; padding: 5px; border: 1px solid #dee0e3; border-radius: 6px; background: white; box-shadow: 0 4px 12px #1f232921; }
+.eppt-context-submenu button { width: 100%; text-align: left; padding: 7px 10px; font-size: 13px; }
+.eppt-zoom-control { flex-shrink: 0; margin-left: auto; gap: 3px; }
+.eppt-zoom-control input { width: 44px; border: 0; padding: 3px 0; text-align: center; background: transparent; font-size: 13px; }
+.eppt-selection-format > button, .eppt-format-trigger { height: 28px; min-width: 28px; display: inline-flex; justify-content: center; align-items: center; gap: 5px; padding: 3px 6px !important; font-size: 13px !important; border-radius: 4px !important; }
+.eppt-selection-format > button b { font-size: 17px; font-weight: 600; }
+.eppt-selection-format > button[aria-pressed="true"], .eppt-selection-format > button[aria-pressed="mixed"], .eppt-format-trigger[aria-expanded="true"] { background: #e8efff; color: #3370ff; }
+.eppt-format-root { display: inline-flex; flex-shrink: 0; }
+.eppt-format-trigger .eppt-chevron { color: #8f959e; font-size: 13px; }
+.eppt-format-trigger > span:first-child:not(.eppt-current-color) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eppt-format-divider { width: 1px; height: 18px; margin: 0 4px; background: #e5e6e8; }
+.eppt-preset-menu > button { width: 92px; justify-content: space-between; }
+.eppt-font-menu > button { width: 128px; justify-content: space-between; }
+.eppt-font-stepper { display: flex; align-items: center; height: 25px; border: 1px solid #d0d3d6; border-radius: 4px; overflow: hidden; margin: 0 2px; }
+.eppt-font-stepper button { width: 24px; height: 24px; padding: 0 !important; color: #8f959e; border-radius: 0 !important; }
+.eppt-font-stepper input { width: 44px !important; height: 24px; border: 0 !important; border-left: 1px solid #dee0e3 !important; border-right: 1px solid #dee0e3 !important; border-radius: 0 !important; text-align: center; padding: 0 2px !important; outline-offset: -2px; }
+.eppt-format-popover { position: fixed; z-index: 180; padding: 5px; border: 1px solid #dee0e3; border-radius: 7px; background: #fff; color: #1f2329; box-shadow: 0 5px 18px #1f232921; white-space: normal; max-width: calc(100vw - 16px); max-height: calc(100vh - 24px); overflow-y: auto; }
+.eppt-format-popover > button, .eppt-font-results > button { width: 100%; height: 32px; display: flex; align-items: center; gap: 9px; border-radius: 4px; padding: 5px 9px; text-align: left; font-size: 13px; }
+.eppt-format-popover button[aria-checked="true"] { color: #3370ff; }
+.eppt-menu-check { margin-left: auto; }
+.eppt-menu-icon { display: inline-flex; color: #646a73; }
+.eppt-format-popover hr { height: 1px; border: 0; background: #eff0f1; margin: 5px -5px; }
+.eppt-menu-caption { margin: 10px 9px 5px; color: #8f959e; font-size: 12px; }
+.eppt-font-search { display: flex; align-items: center; gap: 7px; margin: 2px; padding: 0 7px; border: 1px solid #d0d3d6; border-radius: 4px; color: #8f959e; }
+.eppt-font-search input { width: 100%; height: 28px; border: 0 !important; padding: 4px 0 !important; outline: 0; }
+.eppt-font-search:focus-within { border-color: #3370ff; box-shadow: 0 0 0 1px #3370ff; }
+.eppt-font-results { max-height: 300px; overflow-y: auto; }
+.eppt-selection-kind { padding: 0 6px; color: #646a73; font-size: 13px; }
+.eppt-outline-width { width: 44px !important; height: 28px; text-align: center; }
+.eppt-shape-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.eppt-shape-presets button { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 7px; font-size: 12px; padding: 10px 5px; }
+.eppt-shape-presets button > span { width: 32px; height: 24px; border-radius: 3px; }
+.eppt-link-popover { padding: 9px; }
+.eppt-link-popover label { display: flex; flex-direction: column; gap: 8px; color: #646a73; font-size: 12px; }
+.eppt-link-popover input { width: 100%; }
+.eppt-link-popover > div { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.eppt-link-popover p { color: #d83931; font-size: 12px; }
+.eppt-color-popover { padding: 4px 7px 2px; }
+.eppt-color-letter { line-height: 18px; font-size: 17px; }
+.eppt-color-label { color: #646a73; font-size: 12px; padding: 6px 0 10px; border-bottom: 1px solid #dee0e3; }
+.eppt-color-tabs { display: flex; gap: 14px; border-bottom: 1px solid #dee0e3; }
+.eppt-color-tabs button { position: relative; padding: 6px 0 10px !important; min-width: 0; font-size: 12px !important; border-radius: 0; }
+.eppt-color-tabs button[aria-selected="true"] { color: #3370ff; }
+.eppt-color-tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; bottom: 0; background: #3370ff; border-radius: 2px; }
+.eppt-color-heading { margin: 16px 0 8px; color: #8f959e; font-size: 12px; }
+.eppt-color-swatches { display: grid; grid-template-columns: repeat(8, 20px); justify-content: space-between; gap: 8px 0; }
+.eppt-color-swatches .eppt-color-swatch { display: block; min-width: 20px; width: 20px; height: 20px; padding: 0 !important; border-radius: 50%; border: 1px solid #1f232908; }
+.eppt-color-swatch[aria-pressed="true"] { outline: 2px solid #3370ff; outline-offset: 2px; box-shadow: 0 0 0 1px #fff inset; }
+.eppt-more-colors, .eppt-color-none { display: flex; align-items: center; width: 100%; gap: 8px; padding: 9px 0 !important; margin-top: 8px; border-top: 1px solid #eff0f1 !important; border-radius: 0 !important; font-size: 12px !important; }
+.eppt-more-colors > span:last-child { margin-left: auto; color: #8f959e; font-size: 18px; }
+.eppt-spectrum { display: block; width: 16px; height: 16px; border-radius: 50%; background: conic-gradient(red, #f6df26, #3bbb4d, #22ccce, #3370ff, #b520e8, red); }
+.eppt-current-color { display: block; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #1f232914; }
+.eppt-current-color.empty { background: repeating-conic-gradient(#dee0e3 0% 25%, #fff 0% 50%); background-size: 6px 6px; position: relative; }
+.eppt-current-color.empty::after { content: ""; position: absolute; width: 27px; height: 1px; background: #f54a45; transform: rotate(-45deg); left: -2px; top: 10px; box-shadow: 0 0 0 1px #fff; }
+.eppt-color-circle-root > button { padding: 0 !important; min-width: 28px; }
+.eppt-custom-color { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+.eppt-custom-color input { width: 132px; }
+.eppt-color-popover [role="alert"] { margin: 4px 0; color: #d83931; font-size: 12px; }
+.eppt-properties { width: 294px; flex-basis: 294px; min-width: 294px; padding: 0 16px 22px; background: #fff; border-left: 1px solid #dee0e3; }
+.eppt-properties .eppt-aside-heading { height: 62px; display: flex; align-items: center; font-size: 14px; font-weight: 500; margin: 0; border-bottom: 0; }
+.eppt-properties .eppt-aside-heading button { font-size: 21px; font-weight: 300; padding: 3px; }
+.eppt-element-geometry { padding-bottom: 14px; border-bottom: 1px solid #dee0e3; }
+.eppt-panel-segments { display: flex; align-items: center; border: 1px solid #d7d9dc; border-radius: 4px; height: 29px; overflow: hidden; }
+.eppt-panel-segments > button { flex: 1; height: 27px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 3px !important; border-radius: 3px; position: relative; font-size: 16px; }
+.eppt-panel-segments > button + button::before { content: ""; position: absolute; left: 0; top: 5px; bottom: 5px; width: 1px; background: #dee0e3; }
+.eppt-panel-segments > button[aria-pressed="true"] { color: #3370ff; background: #e8efff; }
+.eppt-object-arrange { margin: 6px 0 12px; color: #8f959e; }
+.eppt-geometry-grid, .eppt-inset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.eppt-number-field { display: flex; align-items: center; gap: 6px; border: 1px solid #d7d9dc; border-radius: 4px; height: 29px; min-width: 0; padding: 0 7px; }
+.eppt-number-field > span { color: #8f959e; font-size: 12px; flex-shrink: 0; }
+.eppt-number-field input { width: 100%; min-width: 0; border: 0 !important; padding: 3px 0 !important; background: transparent !important; font-size: 13px; outline: 0; }
+.eppt-number-field:focus-within { border-color: #3370ff; box-shadow: 0 0 0 1px #3370ff; }
+.eppt-geometry-lock { text-align: left; color: #8f959e; border: 1px solid #d7d9dc !important; height: 29px; padding: 3px 7px !important; }
+.eppt-text-format-panel h3 { font-size: 12px; font-weight: 500; margin: 20px 0 9px; }
+.eppt-text-format-panel > .eppt-preset-menu { width: 100%; margin-bottom: 6px; }
+.eppt-text-format-panel > .eppt-preset-menu > button { width: 100%; border: 1px solid #d7d9dc; height: 29px; }
+.eppt-panel-font-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.eppt-panel-font-row .eppt-font-menu { min-width: 0; flex: 1; }
+.eppt-panel-font-row .eppt-font-menu > button { width: 100%; border: 1px solid #d7d9dc; height: 29px; }
+.eppt-panel-font-row > .eppt-number-field { width: 66px; }
+.eppt-panel-color-row { display: flex; align-items: center; justify-content: space-between; min-height: 40px; gap: 12px; font-size: 12px; color: #646a73; }
+.eppt-panel-paragraph-row { display: flex; gap: 6px; margin: 6px 0; }
+.eppt-panel-paragraph-row > * { flex: 1; min-width: 0; }
+.eppt-panel-paragraph-row > .eppt-format-root > button { border: 1px solid #d7d9dc; width: 100%; justify-content: space-between; }
+.eppt-inset-grid { margin-bottom: 14px; }
+.eppt-paragraph-details { margin-top: 12px; color: #646a73; font-size: 12px; }
+.eppt-paragraph-details summary { cursor: pointer; padding: 7px 0; }
+.eppt-text-format-panel > .eppt-number-field { margin-top: 10px; }
+.eppt-painter-status { position: absolute; bottom: 76px; left: 50%; transform: translateX(-50%); z-index: 90; display: flex; align-items: center; gap: 12px; max-width: calc(100% - 24px); padding: 6px 12px; color: #244a98; background: #edf3ff; border: 1px solid #dbe5fa; border-radius: 6px; font-size: 12px; }
+.eppt-format-trigger, .eppt-selection-format > button, .eppt-panel-segments button { transition: background-color 120ms ease, color 120ms ease; }
+.eppt-context-toolbar, .eppt-format-popover, .eppt-properties:not([hidden]) { animation: eppt-format-reveal 110ms ease-out; }
+@keyframes eppt-format-reveal { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .eppt-format-trigger, .eppt-selection-format > button, .eppt-panel-segments button { transition: none; }
+  .eppt-context-toolbar, .eppt-format-popover, .eppt-properties, .eppt-stage-frame { animation: none !important; }
+}
+
+/* Native table selection and formatting share the contextual editor controls. */
+.eppt-table-cell-display { position:absolute; inset:0; display:flex; flex-direction:column; padding:8px; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.35; }
+.eppt-table-cell-display > span { width:100%; }
+.eppt-table-overlay .eppt-table-grid td > button { position:absolute; inset:0; display:flex; align-items:center; justify-content:inherit; user-select:none; line-height:1.35; }
+.eppt-table-overlay .eppt-table-grid td > button > span { display:block; width:100%; }
+.eppt-table-overlay .eppt-table-grid td:has(button) { cursor:cell; }
+.eppt-table-overlay td.eppt-table-cell-selected { outline:2px solid #3370ff; outline-offset:-2px; }
+.eppt-table-overlay td.eppt-table-cell-selected::after { content:""; position:absolute; inset:1px; background:#3370ff12; pointer-events:none; }
+.eppt-table-overlay td textarea { z-index:2; line-height:1.35; }
+.eppt-table-commands.eppt-selection-format { position:fixed; z-index:95; bottom:auto; transform:none; min-height:42px; max-width:calc(100vw - 16px); overflow-x:auto; overflow-y:visible; font-size:13px; white-space:nowrap; }
+.eppt-table-commands button { flex-shrink:0; }
+.eppt-table-move { cursor:move; touch-action:none; color:#646a73; }
+.eppt-table-font-size { width:42px; height:27px; padding:3px !important; text-align:center; font-size:13px; }
+.eppt-table-selection-count { color:#8f959e; font-size:11px; padding:0 5px; }
+.eppt-table-options { display:flex; flex-direction:column; gap:5px; padding:4px; }
+.eppt-table-options > .eppt-font-menu, .eppt-table-options > .eppt-font-menu > button { width:100%; }
+.eppt-table-options > .eppt-font-menu > button { border:1px solid #dee0e3; justify-content:space-between; }
+.eppt-table-options > button { width:100%; text-align:left; padding:6px 8px; font-size:13px; }
+.eppt-table-options .eppt-panel-segments button { min-width:0; }
+.eppt-table-column-heads { position:absolute; left:0; right:0; top:-24px; height:23px; display:flex; }
+.eppt-table-row-heads { position:absolute; top:0; bottom:0; left:-24px; width:23px; display:flex; flex-direction:column; }
+.eppt-table-column-heads button,.eppt-table-row-heads button,.eppt-table-corner { padding:0 !important; border:1px solid #dee0e3 !important; border-radius:0 !important; background:#f5f6f8 !important; color:#646a73; font-size:13px; min-width:0; min-height:0; }
+.eppt-table-column-heads button[aria-pressed="true"],.eppt-table-row-heads button[aria-pressed="true"] { color:#3370ff; background:#e8efff !important; }
+.eppt-table-corner { position:absolute; top:-24px; left:-24px; width:23px; height:23px; }
+.eppt-table-resizers { position:absolute; inset:0; pointer-events:none; z-index:4; }
+.eppt-table-resize-column { position:absolute; top:0; bottom:0; width:7px; margin-left:-3px; cursor:col-resize; pointer-events:auto; touch-action:none; }
+.eppt-table-resize-row { position:absolute; left:0; right:0; height:7px; margin-top:-3px; cursor:row-resize; pointer-events:auto; touch-action:none; }
+.eppt-table-resize-column:hover,.eppt-table-resize-column:focus-visible { background:#3370ff66; outline:0; }
+.eppt-table-resize-row:hover,.eppt-table-resize-row:focus-visible { background:#3370ff66; outline:0; }
+.eppt-table-message { z-index:9; width:340px; padding:10px; border:1px solid #f8d9b0; border-radius:4px; transform:scale(var(--eppt-ui-scale,1)); transform-origin:left top; font-size:12px; }
+.eppt-table-message textarea { display:block; width:100%; min-height:56px; margin:8px 0; }
+.eppt-table-message button { display:block; margin-top:8px; border:1px solid #d7d9dc; padding:4px 8px; font-size:12px; background:white; }
+.eppt-current-color.mixed { background:linear-gradient(135deg,#dfe0e3 0 50%,white 50% 100%); border-color:#bbbfc4; }
+.eppt-toolbar { flex-shrink:0; }
+.eppt-table-resize-column,.eppt-table-resize-row { pointer-events:none; }
+.eppt-table-resize-column:hover,.eppt-table-resize-row:hover,.eppt-table-resize-column:focus-visible,.eppt-table-resize-row:focus-visible { background:transparent; }
+.eppt-table-resize-column:is(:hover,:focus-visible) > i,.eppt-table-resize-row:is(:hover,:focus-visible) > i { background:#3370ff66; }
+.eppt-table-overlay td.eppt-table-cell-selected { outline:none; }
+.eppt-table-range { position:absolute; border:2px solid #3370ff; box-sizing:border-box; pointer-events:none; z-index:5; }

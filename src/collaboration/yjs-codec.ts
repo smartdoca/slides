@@ -186,7 +186,15 @@ export function projectDocument(
                 delete value[key];
                 return op;
               });
-            Object.assign(value, projectTable(eid, value.cells, operations));
+            const projected = projectTable(eid, value.cells, operations, value);
+            for (const field of [
+              "cellStyles",
+              "merges",
+              "columnWidths",
+              "rowHeights",
+            ])
+              delete value[field];
+            Object.assign(value, projected);
           }
           if (value.type === "text") {
             const text = item.get("text");
@@ -253,7 +261,15 @@ export function patchElement(
     throw new Error("Use the Slate/Yjs binding for text edits");
   if (
     target.get("type") === "table" &&
-    ("cells" in patch || "rowIds" in patch || "columnIds" in patch)
+    [
+      "cells",
+      "rowIds",
+      "columnIds",
+      "cellStyles",
+      "merges",
+      "columnWidths",
+      "rowHeights",
+    ].some((key) => key in patch)
   )
     throw new Error(
       "Use EditorController.tableCommand for table edits; the original cell baseline is immutable",

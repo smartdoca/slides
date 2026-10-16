@@ -52,7 +52,7 @@ it.runIf(process.env.EPPT_PERF === "1")(
             room,
             protocolVersion: 1,
             codec: "eppt",
-            codecRevision: 5,
+            codecRevision: 6,
             schemaVersion: 2,
             vector: Y.encodeStateVector(docs[i]),
           }),
@@ -134,7 +134,7 @@ it.runIf(process.env.EPPT_PERF === "1")(
       const restored = new Y.Doc();
       sockets[0].send(wireEncode({
         type: "sync-request", id: crypto.randomUUID(), room,
-        protocolVersion: 1, codec: "eppt", codecRevision: 5, schemaVersion: 2,
+        protocolVersion: 1, codec: "eppt", codecRevision: 6, schemaVersion: 2,
         epochId: init.epochId, vector: Y.encodeStateVector(restored),
       }));
       Y.applyUpdate(restored, (await receive(0, "sync-response")).update);

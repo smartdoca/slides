@@ -37,7 +37,7 @@ it.runIf(process.env.EPPT_INTEGRATION === "1")(
             type: "sync-request",
             protocolVersion: 1,
             codec: "eppt",
-            codecRevision: 5,
+            codecRevision: 6,
             schemaVersion: 2,
             room,
             vector: Y.encodeStateVector(new Y.Doc()),

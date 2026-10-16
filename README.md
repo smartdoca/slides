@@ -4,7 +4,7 @@
 
 Embeddable collaborative presentation editor for React. The canvas uses LeaferJS, text uses Slate, and the document is a Yjs structure. The host owns identity, images, permissions, and the network.
 
-Licensed under [MIT](LICENSE). Version 0.3.0-alpha.2 is a preview. It is not full PowerPoint compatibility.
+Licensed under [MIT](LICENSE). Version 0.3.0-alpha.3 is a preview. It is not full PowerPoint compatibility.
 
 ## Install
 
@@ -62,3 +62,15 @@ Create the `Y.Doc` once for the document session. Readonly, selection, and panel
 - `members` and `onPresence` are temporary. `captureAnchor` creates a comment anchor the host stores.
 - Call `commitTextEdit` before taking an export snapshot so an open text edit is included.
 - `@smartdoca/slides/pptx` provides `importPptx`, `exportPptx`, and `validatePptxFile`.
+
+## Styling
+
+Selecting an object opens a compact floating format bar. Its text tools follow the inspected Feishu Slides workflow: text presets, searchable fonts, a one-point font-size stepper, alignment, lists, bold, links, font color/highlight tabs, Format Painter, and the optional right-hand Format panel. Click Format Painter once for one target, double-click to keep painting, and press Esc to cancel. Use `⌘/Ctrl Shift C/V` to copy/paste formatting. Text ranges and multiple objects use native editing transactions with one undo step per action; locked objects are skipped and readonly controls cannot write.
+
+The right panel contains geometry, font controls, paragraph alignment/lists/spacing, independent text margins, and character spacing. Five text presets and six shape presets are available. The circular palette shows document colors, basic colors, and custom hexadecimal input. AI editing, cloud font upload, formula conversion and advanced effects are outside this implementation. See [styling behavior and verification](docs/STYLING.md).
+
+## Tables
+
+Tables support rectangular/row/column selection, merge/split, matrix paste, Tab navigation with automatic final-row insertion, row/column resizing, whole-cell formatting, context menus and single-step undo. Native PPTX retains merges, styles and dimensions. Cells still contain plain text; character-range rich text and character-level collaboration within a cell are not implemented. New table operations require `codecRevision: 6` on both client and server. Production hosts must be upgraded separately. See [table behavior and verification](docs/TABLES.md).
+
+See the [0.3.0-alpha.3 release notes](docs/releases/0.3.0-alpha.3.md) for changes, validation and host compatibility requirements.

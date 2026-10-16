@@ -1,4 +1,37 @@
-import type { TextLeaf, TextParagraph } from "./types";
+import type { TextElement, TextLeaf, TextParagraph } from "./types";
+
+export function textInsets(
+  element: Pick<TextElement, "padding" | "paddingInsets">,
+) {
+  return Object.fromEntries(
+    (["top", "right", "bottom", "left"] as const).map((side) => [
+      side,
+      element.paddingInsets?.[side] ?? element.padding ?? 0,
+    ]),
+  ) as Record<"top" | "right" | "bottom" | "left", number>;
+}
+export function textPadding(
+  element: Pick<TextElement, "padding" | "paddingInsets">,
+) {
+  return Object.values(textInsets(element))
+    .map((value) => `${value}px`)
+    .join(" ");
+}
+export function validTextInsets(value: TextElement["paddingInsets"]) {
+  return (
+    value === undefined ||
+    (!!value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Object.entries(value).every(
+        ([key, n]) =>
+          ["top", "right", "bottom", "left"].includes(key) &&
+          Number.isFinite(n) &&
+          n! >= 0 &&
+          n! <= 200,
+      ))
+  );
+}
 
 export function safeTextLink(value: string): string | null {
   const input = value.trim();
@@ -16,6 +49,10 @@ export function safeTextLink(value: string): string | null {
 }
 export function validTextMarks(marks: Partial<TextLeaf>): boolean {
   return (
+    (marks.letterSpacing === undefined ||
+      (Number.isFinite(marks.letterSpacing) &&
+        marks.letterSpacing >= -5 &&
+        marks.letterSpacing <= 100)) &&
     (marks.script === undefined ||
       ["normal", "superscript", "subscript"].includes(marks.script)) &&
     (marks.strike === undefined || typeof marks.strike === "boolean") &&

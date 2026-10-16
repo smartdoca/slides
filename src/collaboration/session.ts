@@ -52,7 +52,7 @@ export class CollaborationSession {
         room: this.options.room,
         protocolVersion: 1,
         codec: "eppt",
-        codecRevision: 5,
+        codecRevision: 6,
         schemaVersion: this.options.schemaVersion,
         epochId: this.epochId,
         stateVector: Y.encodeStateVector(this.options.document),
@@ -63,7 +63,7 @@ export class CollaborationSession {
         room: this.options.room,
         protocolVersion: 1,
         codec: "eppt",
-        codecRevision: 5,
+        codecRevision: 6,
         schemaVersion: this.options.schemaVersion,
         epochId: this.epochId,
         vector: Y.encodeStateVector(this.options.document),
@@ -124,7 +124,7 @@ export class CollaborationSession {
       return;
     }
     if (message.type === "sync-response") {
-      if (message.codecRevision !== 5)
+      if (message.codecRevision !== 6)
         return this.fail(
           new Error(
             "CODEC_REVISION_MISMATCH: upgrade the host and all editor clients together",

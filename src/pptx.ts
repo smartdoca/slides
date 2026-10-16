@@ -5,7 +5,8 @@ import { createId } from "./model/create";
 import { imageFrame, validCrop } from "./model/image";
 import { isShapeKind } from "./model/shapes";
 import { chartSeries } from "./model/chart";
-import { safeTextLink } from "./model/text-format";
+import { safeTextLink, textInsets } from "./model/text-format";
+import { mergeAt, tableCellStyle, tableMetrics } from "./model/table";
 import { PPTX_MAX_BYTES, PPTX_MIME, pptxFilename } from "./file-exchange";
 import { validateDocument } from "./model/validate";
 import { checkPptxZip } from "./zip-limits";
@@ -115,6 +116,7 @@ export async function exportPptx(
             options: {
               fontFace: run.fontFamily ?? "Arial",
               fontSize: run.fontSize ?? 24,
+              charSpacing: run.letterSpacing,
               color: color(run.color ?? el.fill ?? "#202124"),
               highlight:
                 run.backgroundColor && run.backgroundColor !== "transparent"
@@ -155,29 +157,46 @@ export async function exportPptx(
         );
         slide.addText(runs, {
           ...pos,
-          margin: ((el.padding ?? 0) * 72) / 96,
+          // PptxGenJS text margins use left/right/bottom/top (unlike CSS).
+          margin: (["left", "right", "bottom", "top"] as const).map(
+            (side) => (textInsets(el)[side] * 72) / 96,
+          ) as [number, number, number, number],
           valign: el.verticalAlign ?? "top",
-          fill: el.background ? { color: color(el.background) } : undefined,
+          fill:
+            el.background && el.background !== "transparent"
+              ? { color: color(el.background) }
+              : undefined,
           transparency: 100 * (1 - (el.opacity ?? 1)),
         });
       } else if (el.type === "shape") {
         slide.addShape(pptx.ShapeType[el.shape], {
           ...pos,
           fill: {
-            color: color(el.fill ?? "#325af0"),
-            transparency: 100 * (1 - (el.opacity ?? 1)),
+            color: color(
+              el.fill === "transparent" ? "#ffffff" : (el.fill ?? "#325af0"),
+            ),
+            transparency:
+              el.fill === "transparent" ? 100 : 100 * (1 - (el.opacity ?? 1)),
           },
           line: {
-            color: color(el.stroke ?? el.fill ?? "#325af0"),
+            color: color(
+              el.stroke === "transparent"
+                ? "#ffffff"
+                : (el.stroke ?? el.fill ?? "#325af0"),
+            ),
             width: (el.strokeWidth ?? 0) * 0.75,
+            transparency:
+              el.stroke === "transparent" ? 100 : 100 * (1 - (el.opacity ?? 1)),
           },
         });
       } else if (el.type === "line") {
         slide.addShape(pptx.ShapeType.line, {
           ...pos,
           line: {
-            color: color(el.stroke),
+            color: color(el.stroke === "transparent" ? "#ffffff" : el.stroke),
             width: el.strokeWidth * 0.75,
+            transparency:
+              el.stroke === "transparent" ? 100 : 100 * (1 - (el.opacity ?? 1)),
             beginArrowType: undefined,
             endArrowType: el.arrow ? "triangle" : undefined,
           },
@@ -214,23 +233,73 @@ export async function exportPptx(
           transparency: 100 * (1 - (el.opacity ?? 1)),
         });
       } else if (el.type === "table") {
+        const metrics = tableMetrics(el);
+        const unmergedForExport = new Set(
+          (el.merges ?? [])
+            .filter((m) =>
+              el.cells
+                .slice(m.row, m.row + m.rowSpan)
+                .some((row, r) =>
+                  row
+                    .slice(m.column, m.column + m.columnSpan)
+                    .some((value, c) => (r !== 0 || c !== 0) && value),
+                ),
+            )
+            .map((m) => m.id),
+        );
+        if (unmergedForExport.size)
+          issues.push({
+            slideId: id,
+            elementId: el.id,
+            message:
+              "合并区域含被覆盖的协作内容，导出时已拆分这些区域以保留全部文字。",
+          });
         slide.addTable(
-          el.cells.map((row, i) =>
-            row.map((text) => ({
-              text,
-              options: {
-                fill: {
-                  color: i === 0 ? color(el.headerFill ?? "#325af0") : "FFFFFF",
+          el.cells.map((row, r) =>
+            row.flatMap((text, c) => {
+              const found = mergeAt(el, r, c),
+                merge =
+                  found && !unmergedForExport.has(found.id) ? found : undefined;
+              if (merge && (merge.row !== r || merge.column !== c)) return [];
+              const style = tableCellStyle(el, r, c);
+              return [
+                {
+                  text,
+                  options: {
+                    fill:
+                      style.backgroundColor === "transparent"
+                        ? { color: "FFFFFF", transparency: 100 }
+                        : { color: color(style.backgroundColor) },
+                    color: color(style.color),
+                    fontFace: style.fontFamily,
+                    fontSize: style.fontSize,
+                    bold: style.bold,
+                    italic: style.italic,
+                    underline: style.underline
+                      ? { style: "sng" as const }
+                      : undefined,
+                    align: style.align,
+                    valign: (
+                      {
+                        top: "top",
+                        middle: "middle",
+                        bottom: "bottom",
+                      } as const
+                    )[style.verticalAlign],
+                    colspan: merge?.columnSpan,
+                    rowspan: merge?.rowSpan,
+                  },
                 },
-                color: i === 0 ? "FFFFFF" : "24314B",
-              },
-            })),
+              ];
+            }),
           ),
           {
             ...pos,
-            fontSize: 14,
-            border: { color: "CDD5E4", pt: 1 },
-            rowH: pos.h / el.cells.length,
+            fontSize: 13.5,
+            margin: 6,
+            border: { color: "CDD5E4", pt: 0.75 },
+            colW: metrics.columns.map((n) => n / 96),
+            rowH: metrics.rows.map((n) => n / 96),
             autoPage: false,
           },
         );
@@ -386,6 +455,11 @@ export async function importPptx(
         : (palette[v?.schemeClr?.["@_val"]] ?? fallback)
     ).toLowerCase();
   }
+  function shapePaint(v: any, fallback: string): string {
+    return String((v?.srgbClr ?? v?.schemeClr)?.alpha?.["@_val"]) === "0"
+      ? "transparent"
+      : fill(v, fallback);
+  }
   for (const item of many<any>(pres.sldIdLst?.sldId)) {
     const rid = item["@_relId"];
     const target = relation.get(rid)?.["@_Target"];
@@ -477,7 +551,10 @@ export async function importPptx(
       if (spPr?.ln?.headEnd?.["@_type"] && spPr.ln.headEnd["@_type"] !== "none")
         warn("线条起点箭头暂未还原。");
       return {
-        stroke: fill(spPr?.ln?.solidFill, "#202124"),
+        stroke:
+          spPr?.ln?.noFill !== undefined
+            ? "transparent"
+            : shapePaint(spPr?.ln?.solidFill, "#202124"),
         strokeWidth: n(spPr?.ln?.["@_w"], 19050) / 9525,
         ...(end === "triangle" ? { arrow: true } : {}),
       };
@@ -595,6 +672,14 @@ export async function importPptx(
                       ? { backgroundColor: fill(run.rPr.highlight, "#ffff00") }
                       : {}),
                     fontFamily: run.rPr?.latin?.["@_typeface"] ?? "Arial",
+                    ...(run.rPr?.["@_spc"] !== undefined
+                      ? {
+                          letterSpacing: Math.max(
+                            -5,
+                            Math.min(100, n(run.rPr["@_spc"]) / 100),
+                          ),
+                        }
+                      : {}),
                   }))
                 : [{ text: "", fontSize: 24 }];
             })(),
@@ -612,6 +697,27 @@ export async function importPptx(
                   ),
                 }
               : {}),
+            ...(() => {
+              const body = shape.txBody.bodyPr;
+              const insets = Object.fromEntries(
+                (["top", "right", "bottom", "left"] as const).map((side, i) => [
+                  side,
+                  Math.max(
+                    0,
+                    Math.min(
+                      200,
+                      n(
+                        body?.[["@_tIns", "@_rIns", "@_bIns", "@_lIns"][i]],
+                        n(body?.["@_lIns"]),
+                      ) / 9525,
+                    ),
+                  ),
+                ]),
+              );
+              return new Set(Object.values(insets)).size > 1
+                ? { paddingInsets: insets }
+                : {};
+            })(),
             ...(shape.spPr?.solidFill
               ? { background: fill(shape.spPr.solidFill, "#ffffff") }
               : {}),
@@ -633,8 +739,14 @@ export async function importPptx(
             ...base,
             type: "shape",
             shape: isShapeKind(kind) ? kind : "rect",
-            fill: fill(shape.spPr?.solidFill, "#325af0"),
-            stroke: fill(shape.spPr?.ln?.solidFill, "#325af0"),
+            fill:
+              shape.spPr?.noFill !== undefined
+                ? "transparent"
+                : shapePaint(shape.spPr?.solidFill, "#325af0"),
+            stroke:
+              shape.spPr?.ln?.noFill !== undefined
+                ? "transparent"
+                : shapePaint(shape.spPr?.ln?.solidFill, "#325af0"),
             strokeWidth: n(shape.spPr?.ln?.["@_w"]) / 9525,
           },
           shape,
@@ -718,29 +830,116 @@ export async function importPptx(
       );
     for (const frame of many<any>(tree.graphicFrame)) {
       const table = frame.graphic?.graphicData?.tbl;
-      if (table)
+      if (table) {
+        const rows = many<any>(table.tr),
+          columns = many<any>(table.tblGrid?.gridCol);
+        const count = Math.max(
+          1,
+          columns.length ||
+            Math.max(...rows.map((row) => many<any>(row.tc).length)),
+        );
+        const cells: string[][] = rows.map(() => Array(count).fill(""));
+        const cellStyles: import("./model/types").TableCellStyle[][] = rows.map(
+          () => Array.from({ length: count }, () => ({})),
+        );
+        const merges: import("./model/types").TableMerge[] = [];
+        rows.forEach((row, r) => {
+          let c = 0;
+          const entries = many<any>(row.tc);
+          entries.forEach((cell, i) => {
+            if (c >= count) return;
+            const cs = Math.max(
+                1,
+                Math.min(count - c, n(cell["@_gridSpan"], 1)),
+              ),
+              rs = Math.max(
+                1,
+                Math.min(rows.length - r, n(cell["@_rowSpan"], 1)),
+              );
+            if (cell["@_hMerge"] !== "1" && cell["@_vMerge"] !== "1") {
+              cells[r][c] = many<any>(cell.txBody?.p)
+                .map((p) =>
+                  many<any>(p.r)
+                    .map((run) => run.t ?? "")
+                    .join(""),
+                )
+                .join("\n");
+              if (rs * cs > 1)
+                merges.push({
+                  id: createId("merge"),
+                  row: r,
+                  column: c,
+                  rowSpan: rs,
+                  columnSpan: cs,
+                });
+              const p = many<any>(cell.txBody?.p)[0],
+                run = many<any>(p?.r)[0]?.rPr ?? {},
+                tc = cell.tcPr ?? {};
+              cellStyles[r][c] = {
+                ...(tc.solidFill
+                  ? { backgroundColor: shapePaint(tc.solidFill, "#ffffff") }
+                  : {}),
+                ...(run.solidFill
+                  ? { color: fill(run.solidFill, "#24314b") }
+                  : {}),
+                ...(run["@_sz"] !== undefined
+                  ? {
+                      fontSize: Math.max(
+                        6,
+                        Math.min(200, n(run["@_sz"]) / 100),
+                      ),
+                    }
+                  : {}),
+                ...(run.latin?.["@_typeface"]
+                  ? { fontFamily: String(run.latin["@_typeface"]) }
+                  : {}),
+                ...(run["@_b"] !== undefined
+                  ? { bold: run["@_b"] === "1" }
+                  : {}),
+                ...(run["@_i"] !== undefined
+                  ? { italic: run["@_i"] === "1" }
+                  : {}),
+                ...(run["@_u"] !== undefined
+                  ? { underline: run["@_u"] !== "none" }
+                  : {}),
+                align:
+                  ({ ctr: "center", r: "right" } as const)[
+                    p?.pPr?.["@_algn"] as "ctr"
+                  ] ?? "left",
+                verticalAlign:
+                  ({ ctr: "middle", b: "bottom" } as const)[
+                    (tc["@_anchor"] ??
+                      cell.txBody?.bodyPr?.["@_anchor"]) as "ctr"
+                  ] ?? "top",
+              };
+            }
+            c += cs > 1 && entries[i + 1]?.["@_hMerge"] !== "1" ? cs : 1;
+          });
+        });
         add(
           {
             id: createId("table"),
             type: "table",
             name: frame.nvGraphicFramePr?.cNvPr?.["@_name"],
             transform: transform(frame.xfrm),
-            cells: many<any>(table.tr).map((row) =>
-              many<any>(row.tc).map((cell) =>
-                many<any>(cell.txBody?.p)
-                  .map((p) =>
-                    many<any>(p.r)
-                      .map((r) => r.t ?? "")
-                      .join(""),
-                  )
-                  .join("\n"),
-              ),
+            cells,
+            cellStyles,
+            ...(merges.length ? { merges } : {}),
+            ...(columns.length
+              ? {
+                  columnWidths: columns.map((column) =>
+                    Math.max(1, n(column["@_w"]) / 9525),
+                  ),
+                }
+              : {}),
+            rowHeights: rows.map((row) =>
+              Math.max(1, n(row["@_h"], 285750) / 9525),
             ),
             headerFill: "#325af0",
           },
           frame,
         );
-      else if (frame.graphic?.graphicData?.chart) {
+      } else if (frame.graphic?.graphicData?.chart) {
         const chartRel = relations.get(
           frame.graphic.graphicData.chart["@_relId"],
         );

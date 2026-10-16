@@ -1,8 +1,13 @@
+import { validTableClipboard } from "./table";
 import { validChart } from "./chart";
 import type { PresentationDocument } from "./types";
 import { validCrop } from "./image";
 import { isShapeKind } from "./shapes";
-import { validParagraphFormat, validTextMarks } from "./text-format";
+import {
+  validParagraphFormat,
+  validTextMarks,
+  validTextInsets,
+} from "./text-format";
 export function validateDocument(value: PresentationDocument): void {
   const finite = (v: unknown, min: number, max: number) =>
     typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
@@ -64,6 +69,8 @@ export function validateDocument(value: PresentationDocument): void {
       )
         throw new Error("INVALID_TRANSFORM");
       if (el.type === "text") {
+        if (!validTextInsets(el.paddingInsets))
+          throw new Error("INVALID_TEXT_PADDING");
         if (el.padding !== undefined && !finite(el.padding, 0, 200))
           throw new Error("INVALID_TEXT_PADDING");
         if (!Array.isArray(el.paragraphs) || !el.paragraphs.length)
@@ -90,16 +97,20 @@ export function validateDocument(value: PresentationDocument): void {
         throw new Error("INVALID_IMAGE_CROP");
       if (
         el.type === "table" &&
-        (!Array.isArray(el.cells) ||
-          !el.cells.length ||
-          el.cells.length > 100 ||
-          el.cells.some(
-            (r) =>
-              !Array.isArray(r) ||
-              !r.length ||
-              r.length > 100 ||
-              r.length !== el.cells[0].length ||
-              r.some((c) => typeof c !== "string"),
+        (!validTableClipboard({
+          version: 1,
+          cells: el.cells,
+          cellStyles: el.cellStyles,
+          merges: el.merges,
+        }) ||
+          [el.columnWidths, el.rowHeights].some(
+            (sizes, index) =>
+              sizes &&
+              (sizes.length !==
+                (index ? el.cells.length : el.cells[0].length) ||
+                sizes.some(
+                  (size) => !Number.isFinite(size) || size < 0 || size > 100000,
+                )),
           ))
       )
         throw new Error("INVALID_TABLE");

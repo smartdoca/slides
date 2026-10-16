@@ -1,3 +1,5 @@
+import { foreignObjectHtml } from "./xhtml";
+import { TableGrid } from "./TableGrid";
 import {
   forwardRef,
   useEffect,
@@ -46,6 +48,7 @@ import { readDocument, textOf, patchElement } from "../collaboration/yjs-codec";
 import { SlateTextOverlay } from "./SlateTextOverlay";
 import { TableOverlay } from "./TableOverlay";
 import { RichTextView } from "./text";
+import { textPadding } from "../model/text-format";
 import { linePath } from "../model/line";
 import { ChartView } from "./ChartView";
 import { ResourceImage, resolveImageUrl } from "./ResourceImage";
@@ -167,12 +170,15 @@ export const PresentationEditor = forwardRef<
       const node = nodes.current.get(id);
       if (!element) return null;
       if (!moving.current || !node) return element.transform;
-      return element.type === "image" ? imageModelTransform(node) : {
-        x: pxToEmu(node.x ?? 0), y: pxToEmu(node.y ?? 0),
-        width: pxToEmu((node.width ?? 1) * (node.scaleX ?? 1)),
-        height: pxToEmu((node.height ?? 1) * (node.scaleY ?? 1)),
-        rotation: node.rotation ?? 0,
-      };
+      return element.type === "image"
+        ? imageModelTransform(node)
+        : {
+            x: pxToEmu(node.x ?? 0),
+            y: pxToEmu(node.y ?? 0),
+            width: pxToEmu((node.width ?? 1) * (node.scaleX ?? 1)),
+            height: pxToEmu((node.height ?? 1) * (node.scaleY ?? 1)),
+            rotation: node.rotation ?? 0,
+          };
     },
     finishTextEdit: () => setEditing(null),
     getDocument: () => readDocument(document),
@@ -220,7 +226,16 @@ export const PresentationEditor = forwardRef<
       view: host.current,
       // The host viewport owns zoom/scroll. Never pan the contents independently
       // of the fixed slide background and DOM editing overlays.
-      move: { disabled: true, drag: false, dragEmpty: false, dragOut: false, scroll: false, holdSpaceKey: false, holdMiddleKey: false, holdRightKey: false },
+      move: {
+        disabled: true,
+        drag: false,
+        dragEmpty: false,
+        dragOut: false,
+        scroll: false,
+        holdSpaceKey: false,
+        holdMiddleKey: false,
+        holdRightKey: false,
+      },
       zoom: { disabled: true },
       wheel: { disabled: true, preventDefault: false },
       editor: {
@@ -513,7 +528,7 @@ export const PresentationEditor = forwardRef<
                 ? props.resolveAsset?.(element.assetId)
                 : "data:image/svg+xml," +
                   encodeURIComponent(
-                    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${markup}</div></foreignObject></svg>`,
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml">${foreignObjectHtml(markup)}</div></foreignObject></svg>`,
                   );
             if (node.url !== url) node.url = url ?? "";
             renderedContent.current.set(node, element);
@@ -567,183 +582,191 @@ export const PresentationEditor = forwardRef<
   const controller = props.controller ?? ownedController.current;
   return (
     <I18nProvider value={t}>
-    <div
-      className="eppt-slide"
-      onContextMenu={(e) => {
-        if (
-          (e.target as HTMLElement).closest(
-            'textarea,input,[contenteditable="true"]',
+      <div
+        className="eppt-slide"
+        onContextMenu={(e) => {
+          if (
+            (e.target as HTMLElement).closest(
+              'textarea,input,[contenteditable="true"]',
+            )
           )
-        )
-          return;
-        const box = e.currentTarget.getBoundingClientRect(),
-          x = ((e.clientX - box.left) * emuToPx(value.size.width)) / box.width,
-          y = ((e.clientY - box.top) * emuToPx(value.size.height)) / box.height;
-        const target = [...(slide?.elementOrder ?? [])].reverse().find((id) => {
-          const el = slide.elements[id],
-            t = el.transform,
-            a = (-t.rotation * Math.PI) / 180,
-            dx = x - emuToPx(t.x),
-            dy = y - emuToPx(t.y),
-            rx = dx * Math.cos(a) - dy * Math.sin(a),
-            ry = dx * Math.sin(a) + dy * Math.cos(a);
-          return (
-            el.visible !== false &&
-            rx >= 0 &&
-            ry >= 0 &&
-            rx <= emuToPx(t.width) &&
-            ry <= emuToPx(t.height)
-          );
-        });
-        if (target) {
-          e.preventDefault();
-          props.onContextMenu?.({
-            elementId: target,
-            x: e.clientX,
-            y: e.clientY,
-          });
-        }
-      }}
-      style={{
-        position: "relative",
-        width: emuToPx(value.size.width),
-        height: emuToPx(value.size.height),
-        background: slide?.background ?? "#fff",
-        isolation: "isolate",
-        overflow: "clip",
-      }}
-    >
-      <div ref={host} style={{ position: "absolute", inset: 0 }} />
-      {slide?.elementOrder.map((id) => {
-        const el = slide.elements[id];
-        const activeTable =
-          el.type === "table" &&
-          props.selectedIds?.includes(id) &&
-          !current.current.readOnly &&
-          !el.locked;
-        if (
-          (el.type !== "text" && el.type !== "image" && !activeTable) ||
-          el.visible === false
-        )
-          return null;
-        const t = el.transform;
-        return (
-          <div
-            key={id}
-            style={{
-              position: "absolute",
-              pointerEvents: id === editing || activeTable ? "auto" : "none",
-              left: emuToPx(t.x),
-              top: emuToPx(t.y),
-              width: emuToPx(t.width),
-              height: emuToPx(t.height),
-              transform: `rotate(${t.rotation}deg)`,
-              transformOrigin: "0 0",
-              opacity:
-                id === editing || activeTable || el.type === "image"
-                  ? (el.opacity ?? 1)
-                  : 0,
-              overflow: activeTable ? "visible" : "hidden",
-              color: el.type === "text" ? el.fill : undefined,
-              background: el.type === "text" ? el.background : undefined,
-              zIndex: activeTable ? 20 : undefined,
-              ["--eppt-ui-scale" as string]: 1 / (props.viewScale ?? 1),
-            }}
-          >
-            {el.type === "image" ? (
-              <ResourceImage
-                element={el}
-                resolveAsset={props.resolveAsset}
-                fallbackOnly
-                onRetry={() => retryResources((n) => n + 1)}
-              />
-            ) : activeTable && controller && el.type === "table" ? (
-              <TableOverlay
-                key={id}
-                element={el}
-                controller={controller}
-                slideId={slideId}
-                viewScale={props.viewScale}
-                actions={props.tableActions}
-                onDone={() => props.onSelectionChange?.(null)}
-              />
-            ) : el.type === "text" &&
-              editing === id &&
-              textOf(document, slideId, id) ? (
-              <SlateTextOverlay
-                verticalAlign={el.verticalAlign}
-                padding={el.padding}
-                sharedText={textOf(document, slideId, id)!}
-                onDone={() => setEditing(null)}
-                onUndo={() => controller?.undo()}
-                onRedo={() => controller?.redo()}
-                onFormat={props.onTextEditor}
-              />
-            ) : (
-              <ElementContent element={el} resolveAsset={props.resolveAsset} />
-            )}
-          </div>
-        );
-      })}
-      {current.current.readOnly &&
-        (props.selectedIds ?? []).map((id) => {
-          const el = slide?.elements[id];
-          if (!el) return null;
+            return;
+          const box = e.currentTarget.getBoundingClientRect(),
+            x =
+              ((e.clientX - box.left) * emuToPx(value.size.width)) / box.width,
+            y =
+              ((e.clientY - box.top) * emuToPx(value.size.height)) / box.height;
+          const target = [...(slide?.elementOrder ?? [])]
+            .reverse()
+            .find((id) => {
+              const el = slide.elements[id],
+                t = el.transform,
+                a = (-t.rotation * Math.PI) / 180,
+                dx = x - emuToPx(t.x),
+                dy = y - emuToPx(t.y),
+                rx = dx * Math.cos(a) - dy * Math.sin(a),
+                ry = dx * Math.sin(a) + dy * Math.cos(a);
+              return (
+                el.visible !== false &&
+                rx >= 0 &&
+                ry >= 0 &&
+                rx <= emuToPx(t.width) &&
+                ry <= emuToPx(t.height)
+              );
+            });
+          if (target) {
+            e.preventDefault();
+            props.onContextMenu?.({
+              elementId: target,
+              x: e.clientX,
+              y: e.clientY,
+            });
+          }
+        }}
+        style={{
+          position: "relative",
+          width: emuToPx(value.size.width),
+          height: emuToPx(value.size.height),
+          background: slide?.background ?? "#fff",
+          isolation: "isolate",
+          overflow: "clip",
+        }}
+      >
+        <div ref={host} style={{ position: "absolute", inset: 0 }} />
+        {slide?.elementOrder.map((id) => {
+          const el = slide.elements[id];
+          const activeTable =
+            el.type === "table" &&
+            props.selectedIds?.includes(id) &&
+            !current.current.readOnly &&
+            !el.locked;
+          if (
+            (el.type !== "text" && el.type !== "image" && !activeTable) ||
+            el.visible === false
+          )
+            return null;
+          const t = el.transform;
           return (
             <div
               key={id}
-              aria-label={t("editor.readonlySelection")}
               style={{
                 position: "absolute",
-                pointerEvents: "none",
-                border: "1px solid #365dea",
-                left: emuToPx(el.transform.x),
-                top: emuToPx(el.transform.y),
-                width: emuToPx(el.transform.width),
-                height: emuToPx(el.transform.height),
-                transform: `rotate(${el.transform.rotation}deg)`,
+                pointerEvents: id === editing || activeTable ? "auto" : "none",
+                left: emuToPx(t.x),
+                top: emuToPx(t.y),
+                width: emuToPx(t.width),
+                height: emuToPx(t.height),
+                transform: `rotate(${t.rotation}deg)`,
                 transformOrigin: "0 0",
+                opacity:
+                  id === editing || activeTable || el.type === "image"
+                    ? (el.opacity ?? 1)
+                    : 0,
+                overflow: activeTable ? "visible" : "hidden",
+                color: el.type === "text" ? el.fill : undefined,
+                background: el.type === "text" ? el.background : undefined,
+                zIndex: activeTable ? 20 : undefined,
+                ["--eppt-ui-scale" as string]: 1 / (props.viewScale ?? 1),
               }}
-            />
+            >
+              {el.type === "image" ? (
+                <ResourceImage
+                  element={el}
+                  resolveAsset={props.resolveAsset}
+                  fallbackOnly
+                  onRetry={() => retryResources((n) => n + 1)}
+                />
+              ) : activeTable && controller && el.type === "table" ? (
+                <TableOverlay
+                  key={id}
+                  element={el}
+                  controller={controller}
+                  slideId={slideId}
+                  viewScale={props.viewScale}
+                  actions={props.tableActions}
+                  onDone={() => props.onSelectionChange?.(null)}
+                />
+              ) : el.type === "text" &&
+                editing === id &&
+                textOf(document, slideId, id) ? (
+                <SlateTextOverlay
+                  verticalAlign={el.verticalAlign}
+                  padding={el.padding}
+                  paddingInsets={el.paddingInsets}
+                  sharedText={textOf(document, slideId, id)!}
+                  onDone={() => setEditing(null)}
+                  onUndo={() => controller?.undo()}
+                  onRedo={() => controller?.redo()}
+                  onFormat={props.onTextEditor}
+                />
+              ) : (
+                <ElementContent
+                  element={el}
+                  resolveAsset={props.resolveAsset}
+                />
+              )}
+            </div>
           );
         })}
-      {!!guides.length && (
-        <svg
-          aria-label={t("editor.guides")}
-          className="eppt-snap-guides"
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${emuToPx(value.size.width)} ${emuToPx(value.size.height)}`}
-        >
-          {guides.map((g, i) =>
-            g.gap === undefined ? (
-              <line
-                key={i}
-                x1={g.axis === "x" ? g.position : g.start}
-                x2={g.axis === "x" ? g.position : g.end}
-                y1={g.axis === "x" ? g.start : g.position}
-                y2={g.axis === "x" ? g.end : g.position}
+        {current.current.readOnly &&
+          (props.selectedIds ?? []).map((id) => {
+            const el = slide?.elements[id];
+            if (!el) return null;
+            return (
+              <div
+                key={id}
+                aria-label={t("editor.readonlySelection")}
+                style={{
+                  position: "absolute",
+                  pointerEvents: "none",
+                  border: "1px solid #365dea",
+                  left: emuToPx(el.transform.x),
+                  top: emuToPx(el.transform.y),
+                  width: emuToPx(el.transform.width),
+                  height: emuToPx(el.transform.height),
+                  transform: `rotate(${el.transform.rotation}deg)`,
+                  transformOrigin: "0 0",
+                }}
               />
-            ) : (
-              <g key={i}>
+            );
+          })}
+        {!!guides.length && (
+          <svg
+            aria-label={t("editor.guides")}
+            className="eppt-snap-guides"
+            width="100%"
+            height="100%"
+            viewBox={`0 0 ${emuToPx(value.size.width)} ${emuToPx(value.size.height)}`}
+          >
+            {guides.map((g, i) =>
+              g.gap === undefined ? (
                 <line
-                  x1={g.axis === "x" ? g.start : g.position}
-                  x2={g.axis === "x" ? g.end : g.position}
-                  y1={g.axis === "x" ? g.position : g.start}
-                  y2={g.axis === "x" ? g.position : g.end}
+                  key={i}
+                  x1={g.axis === "x" ? g.position : g.start}
+                  x2={g.axis === "x" ? g.position : g.end}
+                  y1={g.axis === "x" ? g.start : g.position}
+                  y2={g.axis === "x" ? g.end : g.position}
                 />
-                <text
-                  x={g.axis === "x" ? (g.start + g.end) / 2 : g.position + 8}
-                  y={g.axis === "x" ? g.position - 8 : (g.start + g.end) / 2}
-                >
-                  {Math.round(g.gap)} px
-                </text>
-              </g>
-            ),
-          )}
-        </svg>
-      )}
-    </div>
+              ) : (
+                <g key={i}>
+                  <line
+                    x1={g.axis === "x" ? g.start : g.position}
+                    x2={g.axis === "x" ? g.end : g.position}
+                    y1={g.axis === "x" ? g.position : g.start}
+                    y2={g.axis === "x" ? g.position : g.end}
+                  />
+                  <text
+                    x={g.axis === "x" ? (g.start + g.end) / 2 : g.position + 8}
+                    y={g.axis === "x" ? g.position - 8 : (g.start + g.end) / 2}
+                  >
+                    {Math.round(g.gap)} px
+                  </text>
+                </g>
+              ),
+            )}
+          </svg>
+        )}
+      </div>
     </I18nProvider>
   );
 });
@@ -780,7 +803,7 @@ export function ElementContent({
           display: "flex",
           flexDirection: "column",
           height: "100%",
-          padding: el.padding ?? 0,
+          padding: textPadding(el),
           boxSizing: "border-box",
           background: el.background,
           justifyContent:
@@ -792,7 +815,10 @@ export function ElementContent({
         }}
       >
         <div style={{ flexShrink: 0 }}>
-          <RichTextView paragraphs={el.paragraphs} interactiveLinks={interactiveLinks} />
+          <RichTextView
+            paragraphs={el.paragraphs}
+            interactiveLinks={interactiveLinks}
+          />
         </div>
       </div>
     );
@@ -805,39 +831,7 @@ export function ElementContent({
       />
     );
   }
-  if (el.type === "table")
-    return (
-      <table
-        style={{
-          width: "100%",
-          height: "100%",
-          borderCollapse: "collapse",
-          tableLayout: "fixed",
-          fontSize: 18,
-        }}
-      >
-        <tbody>
-          {el.cells.map((row, i) => (
-            <tr key={i}>
-              {row.map((cell, j) => (
-                <td
-                  key={j}
-                  style={{
-                    border: "1px solid #cdd5e4",
-                    padding: 8,
-                    background:
-                      i === 0 ? el.headerFill : i % 2 ? "#f1f4fa" : "#fff",
-                    color: i === 0 ? "#fff" : "#24314b",
-                  }}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    );
+  if (el.type === "table") return <TableGrid element={el} />;
   if (el.type === "chart") return <ChartView element={el} />;
   return null;
 }

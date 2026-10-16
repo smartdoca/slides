@@ -23,10 +23,28 @@ import {
 } from "../collaboration/yjs-codec";
 import { LOCAL_ORIGIN, LocalTextOrigin } from "../collaboration/origins";
 import { validCrop } from "./image";
-import { TABLE_OP, tableIds, type TableOperation } from "./table";
+import {
+  TABLE_OP,
+  tableIds,
+  tableBounds,
+  validateTableAction,
+  type TableOperation,
+  type TableCommand,
+} from "./table";
 import type { ShapeKind } from "./shapes";
 import { findText, replaceMatches, type TextMatch } from "./anchors";
-import { validParagraphFormat, validTextMarks } from "./text-format";
+import {
+  validParagraphFormat,
+  validTextMarks,
+  validTextInsets,
+} from "./text-format";
+import {
+  acceptsStyle,
+  DEFAULT_CHARACTER_STYLE,
+  DEFAULT_PARAGRAPH_STYLE,
+  stepFontSize,
+  type CopiedStyle,
+} from "./styles";
 
 export class EditorController {
   readonly history: Y.UndoManager;
@@ -105,6 +123,12 @@ export class EditorController {
   }
   patch(slide: string, id: string, patch: Record<string, unknown>) {
     if (
+      !validTextInsets(
+        patch.paddingInsets as import("./types").TextElement["paddingInsets"],
+      )
+    )
+      throw new Error("INVALID_TEXT_PADDING");
+    if (
       patch.padding !== undefined &&
       (typeof patch.padding !== "number" ||
         !Number.isFinite(patch.padding) ||
@@ -115,7 +139,19 @@ export class EditorController {
     if (patch.crop !== undefined && !validCrop(patch.crop)) return;
     const current = readSlide(this.doc, slide)?.elements[id];
     if (!current) return;
-    if (current.type === "table" && "cells" in patch) return;
+    if (
+      current.type === "table" &&
+      [
+        "cells",
+        "rowIds",
+        "columnIds",
+        "cellStyles",
+        "merges",
+        "columnWidths",
+        "rowHeights",
+      ].some((key) => key in patch)
+    )
+      return;
     if (current.type === "chart" && !validChart({ ...current, ...patch }))
       return;
     this.run(() => patchElement(this.doc, slide, id, patch));
@@ -198,6 +234,7 @@ export class EditorController {
       throw new Error("INVALID_PARAGRAPH_FORMAT");
     this.run(() =>
       ids.forEach((id) => {
+        if (elementOf(this.doc, slide, id)?.get("locked")) return;
         const text = textOf(this.doc, slide, id);
         if (!text) return;
         for (const delta of text.toDelta())
@@ -609,41 +646,140 @@ export class EditorController {
         }
     });
   }
-  tableCommand(
-    slide: string,
-    id: string,
-    command:
-      | {
-          kind: "cell";
-          row: string;
-          column: string;
-          value: string;
-          expected?: string;
-        }
-      | { kind: "insert-row" | "insert-column"; after: string | null }
-      | { kind: "delete-row" | "delete-column"; target: string },
-  ): boolean {
+  tableCommand(slide: string, id: string, command: TableCommand): boolean {
     const el = readSlide(this.doc, slide)?.elements[id];
     if (this.readOnly || el?.type !== "table" || el.locked) return false;
-    const t = tableIds(el),
-      axis = command.kind.endsWith("row") ? t.rowIds : t.columnIds;
+    try {
+      validateTableAction(command);
+    } catch {
+      return false;
+    }
+    const t = tableIds(el);
     if (command.kind === "cell") {
       const row = t.rowIds.indexOf(command.row),
         col = t.columnIds.indexOf(command.column);
-      if (row < 0 || col < 0 || command.value.length > 100000) return false;
       if (
-        command.expected !== undefined &&
-        el.cells[row][col] !== command.expected
+        row < 0 ||
+        col < 0 ||
+        (command.expected !== undefined &&
+          el.cells[row][col] !== command.expected)
       )
         return false;
       if (el.cells[row][col] === command.value) return true;
-    } else if ("target" in command) {
-      if (axis.length <= 1 || !axis.includes(command.target)) return false;
     } else if (
-      axis.length >= 100 ||
-      (command.after !== null && !axis.includes(command.after))
-    )
-      return false;
+      command.kind === "insert-row" ||
+      command.kind === "insert-column"
+    ) {
+      const axis = command.kind === "insert-row" ? t.rowIds : t.columnIds;
+      if (
+        axis.length >= 100 ||
+        (command.after !== null && !axis.includes(command.after))
+      )
+        return false;
+    } else if (
+      command.kind === "delete-row" ||
+      command.kind === "delete-column" ||
+      command.kind === "delete-rows" ||
+      command.kind === "delete-columns"
+    ) {
+      const axis =
+        command.kind === "delete-row" || command.kind === "delete-rows"
+          ? t.rowIds
+          : t.columnIds;
+      const targets = "target" in command ? [command.target] : command.targets;
+      if (
+        targets.some((id) => !axis.includes(id)) ||
+        targets.length >= axis.length
+      )
+        return false;
+    } else if (
+      command.kind === "clear" ||
+      command.kind === "style" ||
+      command.kind === "merge"
+    ) {
+      if (
+        command.rows.some((id) => !t.rowIds.includes(id)) ||
+        command.columns.some((id) => !t.columnIds.includes(id))
+      )
+        return false;
+      if (
+        command.kind === "merge" &&
+        command.rows.length * command.columns.length < 2
+      )
+        return false;
+      if (command.kind === "merge") {
+        const rs = command.rows.map((id) => t.rowIds.indexOf(id)),
+          cs = command.columns.map((id) => t.columnIds.indexOf(id));
+        if (
+          Math.max(...rs) - Math.min(...rs) + 1 !== rs.length ||
+          Math.max(...cs) - Math.min(...cs) + 1 !== cs.length
+        )
+          return false;
+        const bounds = tableBounds(
+          el,
+          { row: Math.min(...rs), column: Math.min(...cs) },
+          { row: Math.max(...rs), column: Math.max(...cs) },
+        );
+        if (
+          el.cells
+            .slice(bounds.top, bounds.bottom + 1)
+            .flatMap((row) => row.slice(bounds.left, bounds.right + 1))
+            .filter(Boolean)
+            .join("\n").length > 100000
+        )
+          return false;
+      }
+      if (
+        command.kind === "clear" &&
+        command.rows.every((row) =>
+          command.columns.every(
+            (column) =>
+              el.cells[t.rowIds.indexOf(row)][t.columnIds.indexOf(column)] ===
+              "",
+          ),
+        )
+      )
+        return true;
+      if (
+        command.kind === "style" &&
+        command.rows.every((row) =>
+          command.columns.every((column) =>
+            Object.entries(command.style).every(
+              ([key, value]) =>
+                el.cellStyles?.[t.rowIds.indexOf(row)]?.[
+                  t.columnIds.indexOf(column)
+                ]?.[key as keyof import("./types").TableCellStyle] === value,
+            ),
+          ),
+        )
+      )
+        return true;
+    } else if (command.kind === "split") {
+      if (!command.targets.some((id) => el.merges?.some((m) => m.id === id)))
+        return false;
+    } else if (command.kind === "resize") {
+      const axis = command.axis === "row" ? t.rowIds : t.columnIds;
+      if (
+        command.sizes.some((item) => !axis.includes(item.target)) ||
+        new Set(command.sizes.map((item) => item.target)).size !==
+          command.sizes.length ||
+        (command.extent !== undefined &&
+          (!Number.isFinite(command.extent) ||
+            command.extent < 1 ||
+            command.extent > 100000))
+      )
+        return false;
+    } else if (command.kind === "paste") {
+      const r = t.rowIds.indexOf(command.row),
+        c = t.columnIds.indexOf(command.column);
+      if (
+        r < 0 ||
+        c < 0 ||
+        r + command.payload.cells.length > 100 ||
+        c + command.payload.cells[0].length > 100
+      )
+        return false;
+    }
     this.run(() => {
       const target = elementOf(this.doc, slide, id)!;
       let clock = 0;
@@ -657,11 +793,21 @@ export class EditorController {
           );
       });
       const opId = createId("table-op"),
-        { expected, ...content } = command as typeof command & {
-          expected?: string;
-        };
-      const op: TableOperation = { ...content, id: opId, clock: clock + 1 };
+        { expected, extent, ...content } = command;
+      const op: TableOperation = {
+        ...structuredClone(content),
+        id: opId,
+        clock: clock + 1,
+      };
       target.set(TABLE_OP + opId, op);
+      if (command.kind === "resize" && command.extent !== undefined)
+        patchElement(this.doc, slide, id, {
+          transform: {
+            [command.axis === "row" ? "height" : "width"]: pxToEmu(
+              command.extent,
+            ),
+          },
+        });
     });
     return true;
   }
@@ -710,6 +856,7 @@ export class EditorController {
     if (!validTextMarks(marks)) throw new Error("INVALID_TEXT_MARKS");
     this.run(() =>
       ids.forEach((id) => {
+        if (elementOf(this.doc, slide, id)?.get("locked")) return;
         const root = textOf(this.doc, slide, id);
         if (!root) return;
         for (const insert of root.toDelta()) {
@@ -719,6 +866,64 @@ export class EditorController {
         }
       }),
     );
+  }
+  /** Only style fields are copied; content, geometry and CRDT text identities stay intact. */
+  applyStyle(slide: string, ids: string[], style: CopiedStyle) {
+    const view = readSlide(this.doc, slide);
+    const targets = [...new Set(ids)].filter(
+      (id) => view?.elements[id] && acceptsStyle(style, view.elements[id]),
+    );
+    this.run(() => {
+      for (const id of targets) {
+        const target = view!.elements[id];
+        if (style.type === "text") {
+          this.formatText(slide, [id], style.marks);
+          this.paragraphFormat(slide, [id], style.paragraph);
+          patchElement(this.doc, slide, id, style.box);
+        } else {
+          patchElement(this.doc, slide, id, {
+            stroke: style.stroke,
+            strokeWidth: style.strokeWidth,
+            opacity: style.opacity,
+            ...(style.type === "shape" && target.type === "shape"
+              ? { fill: style.fill }
+              : {}),
+          });
+        }
+      }
+    });
+  }
+  clearTextFormatting(slide: string, ids: string[]) {
+    this.run(() => {
+      this.formatText(slide, ids, DEFAULT_CHARACTER_STYLE);
+      this.paragraphFormat(slide, ids, DEFAULT_PARAGRAPH_STYLE);
+    });
+  }
+  stepTextSize(
+    slide: string,
+    ids: string[],
+    direction: 1 | -1,
+    increment?: number,
+  ) {
+    this.run(() => {
+      for (const id of new Set(ids)) {
+        if (elementOf(this.doc, slide, id)?.get("locked")) continue;
+        for (const block of textOf(this.doc, slide, id)?.toDelta() ?? []) {
+          if (!(block.insert instanceof Y.XmlText)) continue;
+          let offset = 0;
+          for (const run of block.insert.toDelta()) {
+            if (typeof run.insert !== "string") continue;
+            const fontSize = stepFontSize(
+              run.attributes?.fontSize ?? 24,
+              direction,
+              increment,
+            );
+            block.insert.format(offset, run.insert.length, { fontSize });
+            offset += run.insert.length;
+          }
+        }
+      }
+    });
   }
   private removeFromOrder(order: Y.Array<string>, ids: string[]) {
     for (let i = order.length - 1; i >= 0; i--)

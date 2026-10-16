@@ -26,7 +26,7 @@ class TestTransport implements CollaborationTransport {
   }
 }
 const sessions: CollaborationSession[] = [];
-it.each([undefined, 2, 3, 4, 6])(
+it.each([undefined, 2, 3, 4, 5, 7])(
   "refuses incompatible codec revision %s before applying document bytes",
   async (codecRevision) => {
     const transport = new TestTransport(),
@@ -84,7 +84,7 @@ async function setup() {
       room: "room",
       epochId: epoch,
       codec: "eppt",
-      codecRevision: 5,
+      codecRevision: 6,
       schemaVersion: 2,
       seq: 0,
       checkpointSeq: 0,
@@ -138,7 +138,7 @@ it("rejects unknown negotiated schemas without accepting new document bytes", as
     room: "room",
     epochId: "epoch",
     codec: "eppt",
-    codecRevision: 5,
+    codecRevision: 6,
     schemaVersion: 999,
     seq: 1,
     checkpointSeq: 1,
