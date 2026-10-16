@@ -35,14 +35,18 @@ jobs:
         with:
           node-version: "22"
           registry-url: https://registry.npmjs.org
+      - name: Enable current npm publishing support
+        run: npm install --global npm@11
       - name: Enable Yarn 1
         run: corepack enable && corepack prepare yarn@1.22.22 --activate
       - name: Install dependencies
         run: yarn install --frozen-lockfile
       - name: Build the package
         run: yarn build
+      - name: Check release version
+        run: test "$GITHUB_REF_NAME" = "v$(node -p 'require("./package.json").version')"
       - name: Publish
-        run: npm publish --access public --provenance --ignore-scripts
+        run: npm publish --access public --provenance --ignore-scripts --tag latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

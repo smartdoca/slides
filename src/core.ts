@@ -6,5 +6,8 @@ export * from "./model/anchors";
 export * from "./model/preview-store";
 export * from "./model/slides";
 export * from "./model/text-format";
+export * from "./model/styles";
 export * from "./collaboration/yjs-codec";
 export * from "./collaboration/origins";
+
+export * from "./model/table";

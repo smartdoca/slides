@@ -13,8 +13,8 @@ import { withYjs, YjsEditor } from "@slate-yjs/core";
 import type * as Y from "yjs";
 import { LocalTextOrigin } from "../collaboration/origins";
 import { leafStyle, paragraphStyle } from "./text";
-import { paragraphMarkers } from "../model/text-format";
-import type { TextLeaf, TextParagraph } from "../model/types";
+import { paragraphMarkers, textPadding } from "../model/text-format";
+import type { TextElement, TextLeaf, TextParagraph } from "../model/types";
 
 export function SlateTextOverlay({
   sharedText,
@@ -24,6 +24,7 @@ export function SlateTextOverlay({
   onFormat,
   verticalAlign = "top",
   padding = 0,
+  paddingInsets,
 }: {
   sharedText: Y.XmlText;
   onDone(): void;
@@ -32,6 +33,7 @@ export function SlateTextOverlay({
   onFormat?: (editor: Editor | null) => void;
   verticalAlign?: "top" | "middle" | "bottom";
   padding?: number;
+  paddingInsets?: TextElement["paddingInsets"];
 }) {
   const t = useT();
   const editor = useMemo(
@@ -68,7 +70,7 @@ export function SlateTextOverlay({
           display: "flex",
           flexDirection: "column",
           height: "100%",
-          padding,
+          padding: textPadding({ padding, paddingInsets }),
           boxSizing: "border-box",
           justifyContent:
             verticalAlign === "middle"

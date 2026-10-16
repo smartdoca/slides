@@ -53,6 +53,8 @@ export function FloatingToolbar({
       const bounds = f.getBoundingClientRect(),
         area = v.getBoundingClientRect();
       t.style.maxWidth = `${Math.max(160, area.width - 16)}px`;
+      t.dataset.compact = String(area.width < 740);
+      t.dataset.narrow = String(area.width < 560);
       const next = floatingPosition(
         {
           x: bounds.left + box.x * scale,

@@ -15,6 +15,7 @@ export function leafStyle(leaf: TextLeaf): CSSProperties {
           : undefined,
     color: leaf.color,
     backgroundColor: leaf.backgroundColor,
+    letterSpacing: leaf.letterSpacing === undefined ? undefined : (leaf.letterSpacing * 96) / 72,
     fontWeight: leaf.bold ? 700 : 400,
     fontStyle: leaf.italic ? "italic" : "normal",
     textDecoration:

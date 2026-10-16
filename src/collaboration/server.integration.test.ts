@@ -47,7 +47,7 @@ it.runIf(process.env.EPPT_INTEGRATION === "1")(
           type: "sync-request",
           protocolVersion: 1,
           codec: "eppt",
-          codecRevision: 5,
+          codecRevision: 6,
           schemaVersion: 2,
           room,
           id: crypto.randomUUID(),
@@ -80,7 +80,7 @@ it.runIf(process.env.EPPT_INTEGRATION === "1")(
         type: "sync-request",
         protocolVersion: 1,
         codec: "eppt",
-        codecRevision: 5,
+        codecRevision: 6,
         schemaVersion: 2,
         room,
         id: crypto.randomUUID(),
@@ -103,6 +103,60 @@ it.runIf(process.env.EPPT_INTEGRATION === "1")(
               after: table.rowIds![0],
             });
         },
+        ...(
+          ["style", "merge", "split", "resize", "paste", "clear"] as const
+        ).map((kind) => () => {
+          const table = Object.values(
+            readDocument(doc).slides[sid].elements,
+          ).find(
+            (el) => el.type === "table",
+          ) as import("../model/types").TableElement;
+          const rows = table.rowIds!.slice(1, 3),
+            columns = table.columnIds!.slice(0, 2);
+          if (kind === "style")
+            controller.tableCommand(sid, table.id, {
+              kind,
+              rows,
+              columns,
+              style: { bold: true, backgroundColor: "#fff3b0" },
+            });
+          if (kind === "merge")
+            controller.tableCommand(sid, table.id, { kind, rows, columns });
+          if (kind === "split")
+            controller.tableCommand(sid, table.id, {
+              kind,
+              targets: table.merges!.map((m) => m.id),
+            });
+          if (kind === "resize")
+            controller.tableCommand(sid, table.id, {
+              kind,
+              axis: "column",
+              sizes: table.columnIds!.map((target, i) => ({
+                target,
+                size: 120 + i * 40,
+              })),
+              extent: 480,
+            });
+          if (kind === "paste")
+            controller.tableCommand(sid, table.id, {
+              kind,
+              row: rows[0],
+              column: columns[0],
+              payload: {
+                version: 1,
+                cells: [
+                  ["协同", "粘贴"],
+                  ["保存", "恢复"],
+                ],
+              },
+            });
+          if (kind === "clear")
+            controller.tableCommand(sid, table.id, {
+              kind,
+              rows: [rows[1]],
+              columns: [columns[1]],
+            });
+        }),
       ]) {
         action();
         send(a, {
@@ -146,7 +200,7 @@ it.runIf(process.env.EPPT_INTEGRATION === "1")(
         type: "sync-request",
         protocolVersion: 99,
         codec: "eppt",
-        codecRevision: 5,
+        codecRevision: 6,
         schemaVersion: 2,
         room,
         id: crypto.randomUUID(),

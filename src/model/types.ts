@@ -49,6 +49,8 @@ export interface TextLeaf {
   backgroundColor?: string;
   fontFamily?: string;
   fontSize?: number;
+  /** Extra character spacing in points. */
+  letterSpacing?: number;
 }
 
 export interface TextParagraph {
@@ -71,6 +73,8 @@ export interface TextElement extends ElementBase {
   verticalAlign?: "top" | "middle" | "bottom";
   /** Uniform text inset in CSS pixels, independent of the slide zoom. */
   padding?: number;
+  /** Per-side CSS pixel insets; absent sides use the existing uniform padding. */
+  paddingInsets?: Partial<Record<"top" | "right" | "bottom" | "left", number>>;
 }
 
 export interface ShapeElement extends ElementBase {
@@ -102,6 +106,28 @@ export interface TableElement extends ElementBase {
   rowIds?: string[];
   columnIds?: string[];
   headerFill?: string;
+  cellStyles?: TableCellStyle[][];
+  merges?: TableMerge[];
+  columnWidths?: number[];
+  rowHeights?: number[];
+}
+export interface TableCellStyle {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  fontFamily?: string;
+  fontSize?: number;
+  color?: string;
+  backgroundColor?: string;
+  align?: "left" | "center" | "right";
+  verticalAlign?: "top" | "middle" | "bottom";
+}
+export interface TableMerge {
+  id: string;
+  row: number;
+  column: number;
+  rowSpan: number;
+  columnSpan: number;
 }
 export interface ChartElement extends ElementBase {
   type: "chart";

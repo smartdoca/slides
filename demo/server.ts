@@ -96,7 +96,7 @@ export function attachDemoServer(server: ViteDevServer) {
           message.type === "sync-request" &&
           (message.protocolVersion !== 1 ||
             message.codec !== "eppt" ||
-            message.codecRevision !== 5 ||
+            message.codecRevision !== 6 ||
             message.schemaVersion !== 2)
         )
           throw new Error("UNSUPPORTED_PROTOCOL_OR_SCHEMA");
@@ -136,7 +136,7 @@ export function attachDemoServer(server: ViteDevServer) {
             room: message.room,
             epochId: room.epoch,
             codec: "eppt",
-            codecRevision: 5,
+            codecRevision: 6,
             schemaVersion: 2,
             seq: room.seq,
             checkpointSeq: room.seq,

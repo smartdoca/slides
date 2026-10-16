@@ -1,8 +1,15 @@
-import { useEffect, useState } from "react";
 import type { TextElement, TextLeaf, TextParagraph } from "../model/types";
-import { safeTextLink } from "../model/text-format";
-import { phraseText, useT, type Phrase } from "../i18n";
+import { textInsets } from "../model/text-format";
+import { useT } from "../i18n";
 import { CommitInput } from "./CommitInput";
+import { ColorPicker } from "./ColorPicker";
+import {
+  FontMenu,
+  FormatIcon,
+  FormatMenuItem,
+  FormatPopover,
+  TextPresetMenu,
+} from "./FormatControls";
 
 export function TextFormatPanel({
   element,
@@ -12,6 +19,9 @@ export function TextFormatPanel({
   format,
   paragraphFormat,
   setPadding,
+  onPatch,
+  onPreset,
+  usedFonts,
 }: {
   element: TextElement;
   marks: Partial<TextLeaf> | null;
@@ -22,182 +32,297 @@ export function TextFormatPanel({
     value: Partial<Omit<TextParagraph, "type" | "children">>,
   ): void;
   setPadding(value: number): void;
+  onPatch?(patch: Record<string, unknown>): void;
+  onPreset?(id: string): void;
+  usedFonts?: string[];
 }) {
-  const [link, setLink] = useState(marks?.link ?? ""),
-    [error, setError] = useState<Phrase | null>(null);
-  const t = useT();
-  useEffect(() => {
-    setLink(marks?.link ?? "");
-    setError(null);
-  }, [element.id, marks?.link]);
+  const t = useT(),
+    insets = textInsets(element);
   const number = (
     label: string,
     value: number,
     min: number,
     max: number,
-    change: (v: number) => void,
+    change: (n: number) => void,
+    prefix?: string,
   ) => (
-    <label className="eppt-field" key={label}>
-      {label}
+    <label className="eppt-number-field" title={label}>
+      <span aria-hidden="true">{prefix}</span>
       <CommitInput
         aria-label={label}
         disabled={disabled}
         inputMode="decimal"
         value={String(value)}
-        onCommit={(text) => {
-          const parsed = Number(text);
-          if (
-            text.trim() &&
-            Number.isFinite(parsed) &&
-            parsed >= min &&
-            parsed <= max
-          ) {
-            change(parsed);
-            setError(null);
-          } else
-            setError({
-              key: "format.range",
-              vars: { label, min, max },
-            });
+        onCommit={(input) => {
+          const n = Number(input);
+          if (input.trim() && Number.isFinite(n) && n >= min && n <= max)
+            change(n);
         }}
       />
     </label>
   );
+  const iconButton = (
+    label: string,
+    content: React.ReactNode,
+    pressed: boolean,
+    change: () => void,
+  ) => (
+    <button
+      key={label}
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={pressed}
+      disabled={disabled}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={change}
+    >
+      {content}
+    </button>
+  );
+  const list = paragraph.list ?? (paragraph.bullet ? "bullet" : "none");
   return (
-    <section aria-label={t("format.advanced")}>
-      <div className="eppt-prop-title">{t("format.title")}</div>
-      <label className="eppt-field">
-        {t("format.list")}
-        <select
-          aria-label={t("format.listType")}
+    <section
+      className="eppt-text-format-panel"
+      aria-label={t("format.advanced")}
+    >
+      <h3>{t("style.font")}</h3>
+      {onPreset && (
+        <TextPresetMenu
+          marks={marks ?? {}}
           disabled={disabled}
-          value={paragraph.list ?? (paragraph.bullet ? "bullet" : "none")}
-          onChange={(e) =>
-            paragraphFormat({
-              list: e.target.value as TextParagraph["list"],
-              bullet: e.target.value === "bullet",
-            })
-          }
-        >
-          <option value="none">{t("format.listNone")}</option>
-          <option value="bullet">{t("format.bullet")}</option>
-          <option value="number">{t("format.number")}</option>
-        </select>
-      </label>
-      <div className="eppt-align">
-        <button
-          disabled={disabled || !(paragraph.indentLevel ?? 0)}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() =>
-            paragraphFormat({
-              indentLevel: Math.max(0, (paragraph.indentLevel ?? 0) - 1),
-            })
-          }
-        >
-          {t("format.outdent")}
-        </button>
-        <button
-          disabled={disabled || (paragraph.indentLevel ?? 0) >= 8}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() =>
-            paragraphFormat({
-              indentLevel: Math.min(8, (paragraph.indentLevel ?? 0) + 1),
-            })
-          }
-        >
-          {t("format.indent")}
-        </button>
-      </div>
-      {number(t("format.lineHeight"), paragraph.lineHeight ?? 1.2, 0.5, 5, (lineHeight) =>
-        paragraphFormat({ lineHeight }),
+          onPreset={onPreset}
+        />
       )}
-      {number(
-        t("format.spaceBefore"),
-        paragraph.spaceBefore ?? 0,
-        0,
-        240,
-        (spaceBefore) => paragraphFormat({ spaceBefore }),
-      )}
-      {number(
-        t("format.spaceAfter"),
-        paragraph.spaceAfter ?? 0,
-        0,
-        240,
-        (spaceAfter) => paragraphFormat({ spaceAfter }),
-      )}
-      {number(t("format.padding"), element.padding ?? 0, 0, 200, setPadding)}
-      <label className="eppt-field">
-        {t("format.script")}
-        <select
-          aria-label={t("format.script")}
+      <div className="eppt-panel-font-row">
+        <FontMenu
+          value={marks?.fontFamily ?? "Arial"}
+          used={usedFonts}
           disabled={disabled}
-          value={marks?.script ?? "normal"}
-          onChange={(e) =>
-            format({ script: e.target.value as TextLeaf["script"] })
-          }
-        >
-          <option value="normal">{t("format.normal")}</option>
-          <option value="superscript">{t("format.super")}</option>
-          <option value="subscript">{t("format.sub")}</option>
-        </select>
-      </label>
-      <button
-        disabled={disabled}
-        aria-pressed={marks?.strike ?? false}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => format({ strike: !marks?.strike })}
-      >
-        {t("format.strike")}
-      </button>
-      <form
-        className="eppt-text-link"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (disabled) return;
-          const url = safeTextLink(link);
-          if (!url) {
-            setError({ key: "format.linkError" });
-            return;
-          }
-          format({ link: url });
-          setError(null);
-        }}
-      >
-        <label className="eppt-field">
-          {t("format.link")}
-          <input
-            aria-label={t("format.linkLabel")}
-            disabled={disabled}
-            value={link}
-            placeholder="https://example.com"
-            onChange={(e) => setLink(e.target.value)}
-          />
-        </label>
-        <button disabled={disabled} type="submit">
-          {t("format.applyLink")}
-        </button>{" "}
-        <button
-          disabled={disabled || !marks?.link}
-          type="button"
-          onClick={() => {
-            format({ link: "" });
-            setLink("");
-          }}
-        >
-          {t("format.removeLink")}
-        </button>
-        {marks?.link && safeTextLink(marks.link) && (
-          <a
-            href={safeTextLink(marks.link)!}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t("format.openLink")}
-          </a>
+          onChange={(fontFamily) => format({ fontFamily })}
+        />
+        {number(
+          t("toolbar.fontSize"),
+          marks?.fontSize ?? 24,
+          6,
+          200,
+          (fontSize) => format({ fontSize }),
         )}
-        <p className="eppt-muted">{t("format.linkHint")}</p>
-      </form>
-      {error && <p role="alert">{phraseText(t, error)}</p>}
+      </div>
+      <div className="eppt-panel-segments">
+        {(["bold", "strike", "italic", "underline"] as const).map((mark) =>
+          iconButton(
+            t(mark === "strike" ? "format.strike" : `toolbar.${mark}`),
+            <span
+              style={{
+                fontWeight: mark === "bold" ? 600 : undefined,
+                fontStyle: mark === "italic" ? "italic" : undefined,
+                textDecoration:
+                  mark === "strike"
+                    ? "line-through"
+                    : mark === "underline"
+                      ? "underline"
+                      : undefined,
+              }}
+            >
+              {{ bold: "B", strike: "S", italic: "I", underline: "U" }[mark]}
+            </span>,
+            !!marks?.[mark],
+            () => format({ [mark]: !marks?.[mark] }),
+          ),
+        )}
+      </div>
+      <div className="eppt-panel-color-row">
+        <span>{t("toolbar.textColor")}</span>
+        <ColorPicker
+          circle
+          label={t("toolbar.textColor")}
+          value={marks?.color ?? element.fill ?? "#1f2329"}
+          disabled={disabled}
+          onChange={(color) => format({ color })}
+        />
+      </div>
+      <div className="eppt-panel-color-row">
+        <span>{t("feishu.highlight")}</span>
+        <ColorPicker
+          circle
+          label={t("color.highlight")}
+          value={marks?.backgroundColor}
+          clearable
+          disabled={disabled}
+          onChange={(backgroundColor) =>
+            format({ backgroundColor: backgroundColor ?? "transparent" })
+          }
+        />
+      </div>
+      <h3>{t("props.paragraph")}</h3>
+      <div className="eppt-panel-paragraph-row">
+        <div className="eppt-panel-segments">
+          {(["left", "center", "right"] as const).map((align) =>
+            iconButton(
+              t(`style.align.${align}`),
+              <FormatIcon
+                name={
+                  align === "left"
+                    ? "alignLeft"
+                    : align === "center"
+                      ? "alignCenter"
+                      : "alignRight"
+                }
+              />,
+              (paragraph.align ?? "left") === align,
+              () => paragraphFormat({ align }),
+            ),
+          )}
+        </div>
+        <div className="eppt-panel-segments">
+          {(["top", "middle", "bottom"] as const).map((verticalAlign) =>
+            iconButton(
+              t(`props.${verticalAlign}`),
+              <FormatIcon name={verticalAlign} />,
+              (element.verticalAlign ?? "top") === verticalAlign,
+              () => onPatch?.({ verticalAlign }),
+            ),
+          )}
+        </div>
+      </div>
+      <div className="eppt-panel-paragraph-row">
+        {(["bullet", "number"] as const).map((kind) => (
+          <FormatPopover
+            key={kind}
+            label={t(kind === "bullet" ? "format.bullet" : "format.number")}
+            disabled={disabled}
+            trigger={
+              <>
+                <FormatIcon name={kind === "bullet" ? "list" : "number"} />
+                <span className="eppt-chevron">⌄</span>
+              </>
+            }
+          >
+            {(close) => (
+              <>
+                {(["none", kind] as const).map((value) => (
+                  <FormatMenuItem
+                    key={value}
+                    checked={list === value}
+                    onClick={() => {
+                      paragraphFormat({
+                        list: value,
+                        bullet: value === "bullet",
+                      });
+                      close();
+                    }}
+                  >
+                    {t(
+                      value === "none"
+                        ? "format.listNone"
+                        : value === "bullet"
+                          ? "feishu.unordered"
+                          : "feishu.ordered",
+                    )}
+                  </FormatMenuItem>
+                ))}
+              </>
+            )}
+          </FormatPopover>
+        ))}
+      </div>
+      <div className="eppt-panel-paragraph-row">
+        {number(
+          t("format.lineHeight"),
+          paragraph.lineHeight ?? 1.2,
+          0.5,
+          5,
+          (lineHeight) => paragraphFormat({ lineHeight }),
+          "↕A",
+        )}
+        {number(
+          t("feishu.letterSpacing"),
+          marks?.letterSpacing ?? 0,
+          -5,
+          100,
+          (letterSpacing) => format({ letterSpacing }),
+          "|A|",
+        )}
+      </div>
+      <h3>{t("feishu.textInsets")}</h3>
+      <div className="eppt-inset-grid">
+        {(["left", "right", "top", "bottom"] as const).map((side, index) => (
+          <div key={side}>
+            {number(
+              t(`feishu.inset.${side}`),
+              insets[side],
+              0,
+              200,
+              (value) =>
+                onPatch
+                  ? onPatch({ paddingInsets: { [side]: value } })
+                  : setPadding(value),
+              ["⊣", "⊢", "⊤", "⊥"][index],
+            )}
+          </div>
+        ))}
+      </div>
+      <details className="eppt-paragraph-details">
+        <summary>{t("feishu.paragraphSpacing")}</summary>
+        <div className="eppt-panel-paragraph-row">
+          {number(
+            t("format.spaceBefore"),
+            paragraph.spaceBefore ?? 0,
+            0,
+            240,
+            (spaceBefore) => paragraphFormat({ spaceBefore }),
+            t("feishu.before"),
+          )}
+          {number(
+            t("format.spaceAfter"),
+            paragraph.spaceAfter ?? 0,
+            0,
+            240,
+            (spaceAfter) => paragraphFormat({ spaceAfter }),
+            t("feishu.after"),
+          )}
+        </div>
+        <div className="eppt-panel-segments">
+          {iconButton(
+            t("format.outdent"),
+            <FormatIcon name="outdent" />,
+            false,
+            () =>
+              paragraphFormat({
+                indentLevel: Math.max(0, (paragraph.indentLevel ?? 0) - 1),
+              }),
+          )}
+          {iconButton(
+            t("format.indent"),
+            <FormatIcon name="indent" />,
+            false,
+            () =>
+              paragraphFormat({
+                indentLevel: Math.min(8, (paragraph.indentLevel ?? 0) + 1),
+              }),
+          )}
+        </div>
+      </details>
+      <div className="eppt-panel-color-row">
+        <span>{t("feishu.fill")}</span>
+        <ColorPicker
+          circle
+          label={t("color.textBackground")}
+          value={element.background}
+          clearable
+          disabled={disabled}
+          onChange={(background) => onPatch?.({ background })}
+        />
+      </div>
+      {number(
+        t("props.opacityLabel"),
+        Math.round((element.opacity ?? 1) * 100),
+        0,
+        100,
+        (value) => onPatch?.({ opacity: value / 100 }),
+        t("props.opacityLabel"),
+      )}
     </section>
   );
 }

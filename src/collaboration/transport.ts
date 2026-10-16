@@ -9,7 +9,7 @@ export interface CollaborationConnectOptions {
   room: string;
   protocolVersion: 1;
   codec: "eppt";
-  codecRevision: 5;
+  codecRevision: 6;
   schemaVersion: number;
   epochId?: string;
   stateVector: Uint8Array;
@@ -22,7 +22,7 @@ export type ClientMessage =
       room: string;
       protocolVersion: 1;
       codec: "eppt";
-      codecRevision: 5;
+      codecRevision: 6;
       schemaVersion: number;
       epochId?: string;
       vector: Uint8Array;
