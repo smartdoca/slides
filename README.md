@@ -4,7 +4,7 @@
 
 Embeddable collaborative presentation editor for React. The canvas uses LeaferJS, text uses Slate, and the document is a Yjs structure. The host owns identity, images, permissions, and the network.
 
-Licensed under [MIT](LICENSE). Version 0.3.0-alpha.3 is a preview. It is not full PowerPoint compatibility.
+Licensed under [MIT](LICENSE). Version 0.3.0-alpha.4 is a preview. It is not full PowerPoint compatibility.
 
 ## Install
 
@@ -35,6 +35,7 @@ Create the `Y.Doc` once for the document session. Readonly, selection, and panel
 | `readOnly` | `boolean` | Stops editing. |
 | `chrome` | `"embedded" \| "demo"` | Embedded has no demo business chrome. Defaults to embedded. |
 | `resources` | `PresentationResources` | `uploadImage` stores a file and `resolveUrl` returns a display URL. |
+| `onImagePreview` | `PresentationImagePreviewHandler` | Opens a host-owned gallery from stable references across all slides. |
 | `members` | `PresentationPresence[]` | Remote presence supplied by the host. |
 | `sessionId` | `string` | This tab's session. |
 | `onPresence` | `(slideId, ids) => void` | Local slide and element selection. It is not a content write. |
@@ -73,4 +74,6 @@ The right panel contains geometry, font controls, paragraph alignment/lists/spac
 
 Tables support rectangular/row/column selection, merge/split, matrix paste, Tab navigation with automatic final-row insertion, row/column resizing, whole-cell formatting, context menus and single-step undo. Native PPTX retains merges, styles and dimensions. Cells still contain plain text; character-range rich text and character-level collaboration within a cell are not implemented. New table operations require `codecRevision: 6` on both client and server. Production hosts must be upgraded separately. See [table behavior and verification](docs/TABLES.md).
 
-See the [0.3.0-alpha.3 release notes](docs/releases/0.3.0-alpha.3.md) for changes, validation and host compatibility requirements.
+## Image preview
+
+Click an image once to select it, then click it again or use its preview button to enlarge it. Readonly images preview on one click. The default lightbox navigates images across all slides with buttons, arrow keys, horizontal drag/swipe or a trackpad. Supply `onImagePreview` to use a host-owned viewer with stable asset references and host authorization. See [the API and resource boundary](docs/IMAGE-PREVIEW.md) and the [0.3.0-alpha.4 release notes](docs/releases/0.3.0-alpha.4.md).

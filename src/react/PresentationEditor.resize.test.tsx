@@ -6,7 +6,9 @@ import * as Y from "yjs";
 import { createPresentation } from "../model/create";
 import { createYDocument, readDocument } from "../collaboration/yjs-codec";
 import { EditorController } from "../model/controller";
-import { pxToEmu } from "../model/types";
+import { pxToEmu, type ImageElement } from "../model/types";
+import type { PresentationImagePreviewHandler } from "../model/image-preview";
+import { REMOTE_ORIGIN } from "../collaboration/origins";
 import {
   PresentationEditor,
   type PresentationEditorHandle,
@@ -42,7 +44,12 @@ const engine = vi.hoisted(() => {
   let instance: App;
   class App extends Events {
     editor = new Editor();
-    tree = { add() {} };
+    nodes: Node[] = [];
+    tree = {
+      add: (node: Node) => {
+        this.nodes.push(node);
+      },
+    };
     constructor(public config: any) {
       super();
       instance = this;
@@ -241,6 +248,215 @@ it("keeps a fixed page for off-page content and local zoom without rewriting the
     expect(updates).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
+    controller.dispose();
+    doc.destroy();
+  }
+});
+
+it("selects an image first, previews the next click with all-slide stable references, and uses the latest host callback", async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const doc = createYDocument(createPresentation()),
+    controller = new EditorController(doc),
+    sid = readDocument(doc).slideOrder[0],
+    nextSlide = controller.addSlide();
+  const image = (id: string): ImageElement => ({
+    id,
+    type: "image",
+    assetId: "asset-" + id,
+    transform: {
+      x: 0,
+      y: 0,
+      width: pxToEmu(300),
+      height: pxToEmu(200),
+      rotation: 0,
+    },
+  });
+  controller.insert(sid, image("first"));
+  controller.insert(nextSlide, image("next"));
+  controller.history.clear();
+  const original = readDocument(doc),
+    writes = vi.fn(),
+    selection = vi.fn(),
+    first = vi.fn(),
+    second = vi.fn(),
+    error = vi.fn();
+  doc.on("update", writes);
+  const host = document.createElement("div"),
+    root = createRoot(host);
+  document.body.append(host);
+  const render = (
+    ids: string[],
+    callback: PresentationImagePreviewHandler = first,
+    mode: "edit" | "readonly" = "edit",
+  ) =>
+    act(() =>
+      root.render(
+        <PresentationEditor
+          document={doc}
+          controller={controller}
+          slideId={sid}
+          selectedIds={ids}
+          mode={mode}
+          onImagePreview={callback}
+          onSelectionChange={selection}
+          onError={error}
+        />,
+      ),
+    );
+  const down = (shiftKey = false) =>
+    act(() =>
+      host
+        .querySelector(".eppt-slide")!
+        .dispatchEvent(
+          new MouseEvent("pointerdown", { bubbles: true, shiftKey }),
+        ),
+    );
+  try {
+    render([]);
+    const app = engine.get(),
+      node = app.nodes.find((node) => node.id === "first")!;
+    down();
+    app.editor.target = [node];
+    render(["first"]); // Native selection happens before the tap callback.
+    act(() => node.emit("tap"));
+    expect(first).not.toHaveBeenCalled();
+    down();
+    act(() => node.emit("tap"));
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(first.mock.calls[0][0]).toEqual({
+      currentId: JSON.stringify([sid, "first"]),
+      gallery: [
+        {
+          id: JSON.stringify([sid, "first"]),
+          slideId: sid,
+          elementId: "first",
+          assetId: "asset-first",
+        },
+        {
+          id: JSON.stringify([nextSlide, "next"]),
+          slideId: nextSlide,
+          elementId: "next",
+          assetId: "asset-next",
+        },
+      ],
+    });
+    expect(document.body.querySelector(".eppt-image-preview")).toBeNull();
+    act(() => node.emit("double"));
+    expect(first).toHaveBeenCalledTimes(1); // A tap and double-tap for one pointer dispatch once.
+    down();
+    act(() => node.emit("double"));
+    expect(first).toHaveBeenCalledTimes(2); // Fast repeated clicks use the engine's double-tap path.
+    down(true);
+    act(() => node.emit("tap"));
+    act(() => node.emit("double"));
+    expect(first).toHaveBeenCalledTimes(2);
+    render(["first"], second);
+    down();
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[aria-label="预览图片"]')!.click(),
+    );
+    expect(second).toHaveBeenCalledTimes(1);
+    act(() => node.emit("double"));
+    expect(second).toHaveBeenCalledTimes(1);
+    render([], second, "readonly");
+    down();
+    act(() => node.emit("tap"));
+    expect(second).toHaveBeenCalledTimes(2);
+    render(
+      [],
+      () => Promise.reject(new Error("host preview denied")),
+      "readonly",
+    );
+    down();
+    await act(async () => {
+      node.emit("tap");
+      await Promise.resolve();
+    });
+    expect(error).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ message: "host preview denied" }),
+    );
+    expect(engine.get()).toBe(app);
+    expect(readDocument(doc)).toEqual(original);
+    expect(writes).not.toHaveBeenCalled();
+    expect(controller.history.undoStack).toHaveLength(0);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    controller.dispose();
+    doc.destroy();
+  }
+});
+
+it("opens the standalone viewer in readonly, navigates across slides, and closes on image deletion without extra writes", () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const doc = createYDocument(createPresentation()),
+    controller = new EditorController(doc),
+    sid = readDocument(doc).slideOrder[0],
+    other = controller.addSlide();
+  for (const [slideId, id] of [
+    [sid, "one"],
+    [other, "two"],
+  ])
+    controller.insert(slideId, {
+      id,
+      type: "image",
+      assetId: id,
+      alt: id,
+      transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+    });
+  const host = document.createElement("div"),
+    root = createRoot(host),
+    writes = vi.fn();
+  document.body.append(host);
+  doc.on("update", writes);
+  try {
+    act(() =>
+      root.render(
+        <PresentationEditor
+          document={doc}
+          controller={controller}
+          slideId={sid}
+          mode="readonly"
+          resolveAsset={(id) => "/allowed/" + id}
+        />,
+      ),
+    );
+    act(() =>
+      engine
+        .get()
+        .nodes.find((node) => node.id === "one")!
+        .emit("tap"),
+    );
+    expect(
+      document.body
+        .querySelector<HTMLImageElement>(".eppt-image-preview img")!
+        .getAttribute("src"),
+    ).toBe("/allowed/one");
+    act(() =>
+      document.body
+        .querySelector<HTMLButtonElement>('[aria-label="下一张图片"]')!
+        .click(),
+    );
+    expect(
+      document.body.querySelector<HTMLImageElement>(".eppt-image-preview img")!
+        .alt,
+    ).toBe("two");
+    expect(writes).not.toHaveBeenCalled();
+    const remote = new Y.Doc();
+    Y.applyUpdate(remote, Y.encodeStateAsUpdate(doc));
+    const peer = new EditorController(remote);
+    controller.history.clear();
+    peer.remove(other, ["two"]);
+    act(() => Y.applyUpdate(doc, Y.encodeStateAsUpdate(remote), REMOTE_ORIGIN));
+    expect(document.body.querySelector(".eppt-image-preview")).toBeNull();
+    expect(writes).toHaveBeenCalledTimes(1);
+    expect(readDocument(doc)).toEqual(readDocument(remote));
+    expect(controller.history.undoStack).toHaveLength(0);
+    peer.dispose();
+    remote.destroy();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
     controller.dispose();
     doc.destroy();
   }

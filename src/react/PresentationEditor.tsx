@@ -55,6 +55,12 @@ import { ResourceImage, resolveImageUrl } from "./ResourceImage";
 import { presentationStore } from "../model/projection-store";
 import { chartSvg } from "./chart-renderer";
 import { createTextPainter } from "./text-paint";
+import { ImagePreviewDialog } from "./ImagePreviewDialog";
+import {
+  presentationImages,
+  presentationImagePreview,
+  type PresentationImagePreviewHandler,
+} from "../model/image-preview";
 import {
   imageFrame,
   imageNodeTransform,
@@ -79,6 +85,8 @@ export interface PresentationEditorProps {
   mode?: "edit" | "readonly";
   selectedIds?: string[];
   resolveAsset?: (id: string) => string;
+  /** Host-owned lightbox. Receives ordered stable image references from this document only. */
+  onImagePreview?: PresentationImagePreviewHandler;
   onReady?: (editor: PresentationEditorHandle) => void;
   onSelectionChange?: (selection: EditorSelection) => void;
   onError?: (error: Error) => void;
@@ -140,6 +148,24 @@ export const PresentationEditor = forwardRef<
   const [forcedReadonly, forceReadonly] = useState(false);
   const [resourceRevision, retryResources] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    document: Y.Doc;
+    currentId: string;
+  } | null>(null);
+  const gallery = useMemo(
+    () =>
+      preview?.document === document && !props.onImagePreview
+        ? presentationImages(value)
+        : [],
+    [value, document, preview?.document, props.onImagePreview],
+  );
+  const previewImage = useRef<(elementId: string) => void>(() => {});
+  const selectionBeforePointer = useRef<{
+    slideId: string;
+    ids: string[];
+    modified: boolean;
+    previewed: boolean;
+  } | null>(null);
   const ownedController = useRef<EditorController | null>(null);
   const current = useRef({ props, value, slideId, editing, readOnly: false });
   current.current = {
@@ -149,6 +175,48 @@ export const PresentationEditor = forwardRef<
     editing,
     readOnly: forcedReadonly || props.mode === "readonly",
   };
+  previewImage.current = (elementId) => {
+    const state = current.current,
+      event = presentationImagePreview(
+        readDocument(state.props.document),
+        state.slideId,
+        elementId,
+      );
+    if (!event) return;
+    if (selectionBeforePointer.current)
+      selectionBeforePointer.current.previewed = true;
+    const callback = state.props.onImagePreview;
+    if (!callback) {
+      setPreview({
+        document: state.props.document,
+        currentId: event.currentId,
+      });
+      return;
+    }
+    const report = (error: unknown) => {
+      if (
+        app.current &&
+        current.current.props.document === state.props.document
+      )
+        current.current.props.onError?.(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+    };
+    try {
+      Promise.resolve(callback(event)).catch(report);
+    } catch (error) {
+      report(error);
+    }
+  };
+  useEffect(() => {
+    if (
+      preview &&
+      (preview.document !== document ||
+        props.onImagePreview ||
+        !gallery.some((image) => image.id === preview.currentId))
+    )
+      setPreview(null);
+  }, [document, gallery, props.onImagePreview, preview]);
   const syncing = useRef(false);
   const pendingCharts = useRef(new Map<string, Promise<void>>());
   const [guides, setGuides] = useState<SnapGuide[]>([]);
@@ -416,8 +484,28 @@ export const PresentationEditor = forwardRef<
         let node = nodes.current.get(id);
         if (!node) {
           node = makeNode(element);
+          const previewTap = () => {
+            const pointer = selectionBeforePointer.current;
+            if (pointer?.previewed) return;
+            if (pointer) pointer.previewed = true;
+            previewImage.current(id);
+          };
           node.on(PointerEvent.TAP, () => {
-            const state = current.current;
+            const state = current.current,
+              fresh = state.value.slides[state.slideId]?.elements[id],
+              before = selectionBeforePointer.current;
+            if (
+              fresh?.type === "image" &&
+              (state.readOnly ||
+                fresh.locked ||
+                (before?.slideId === state.slideId &&
+                  !before.modified &&
+                  before.ids.length === 1 &&
+                  before.ids[0] === id))
+            ) {
+              previewTap();
+              return;
+            }
             if (state.readOnly)
               state.props.onSelectionChange?.({
                 type: "elements",
@@ -428,6 +516,13 @@ export const PresentationEditor = forwardRef<
           node.on(PointerEvent.DOUBLE_TAP, () => {
             const state = current.current;
             const fresh = state.value.slides[state.slideId]?.elements[id];
+            if (
+              fresh?.type === "image" &&
+              !selectionBeforePointer.current?.modified
+            ) {
+              previewTap();
+              return;
+            }
             if (!state.readOnly && fresh?.type === "text" && !fresh.locked)
               setEditing(id);
           });
@@ -584,6 +679,17 @@ export const PresentationEditor = forwardRef<
     <I18nProvider value={t}>
       <div
         className="eppt-slide"
+        onPointerDownCapture={(event) => {
+          selectionBeforePointer.current = {
+            slideId,
+            ids:
+              app.current?.editor.list
+                .map((node) => node.id!)
+                .filter(Boolean) ?? [],
+            modified: event.shiftKey || event.ctrlKey || event.metaKey,
+            previewed: false,
+          };
+        }}
         onContextMenu={(e) => {
           if (
             (e.target as HTMLElement).closest(
@@ -645,18 +751,18 @@ export const PresentationEditor = forwardRef<
             el.visible === false
           )
             return null;
-          const t = el.transform;
+          const transform = el.transform;
           return (
             <div
               key={id}
               style={{
                 position: "absolute",
                 pointerEvents: id === editing || activeTable ? "auto" : "none",
-                left: emuToPx(t.x),
-                top: emuToPx(t.y),
-                width: emuToPx(t.width),
-                height: emuToPx(t.height),
-                transform: `rotate(${t.rotation}deg)`,
+                left: emuToPx(transform.x),
+                top: emuToPx(transform.y),
+                width: emuToPx(transform.width),
+                height: emuToPx(transform.height),
+                transform: `rotate(${transform.rotation}deg)`,
                 transformOrigin: "0 0",
                 opacity:
                   id === editing || activeTable || el.type === "image"
@@ -670,12 +776,44 @@ export const PresentationEditor = forwardRef<
               }}
             >
               {el.type === "image" ? (
-                <ResourceImage
-                  element={el}
-                  resolveAsset={props.resolveAsset}
-                  fallbackOnly
-                  onRetry={() => retryResources((n) => n + 1)}
-                />
+                <>
+                  <ResourceImage
+                    element={el}
+                    resolveAsset={props.resolveAsset}
+                    fallbackOnly
+                    onRetry={() => retryResources((n) => n + 1)}
+                  />
+                  {props.selectedIds?.length === 1 &&
+                    props.selectedIds[0] === id && (
+                      <button
+                        type="button"
+                        className="eppt-image-preview-trigger"
+                        aria-label={t("image.preview")}
+                        title={t("image.preview")}
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          previewImage.current(id);
+                        }}
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 16 16"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          aria-hidden="true"
+                        >
+                          <circle cx="6.5" cy="6.5" r="4.5" />
+                          <path d="m10 10 4 4M6.5 4v5M4 6.5h5" />
+                        </svg>
+                      </button>
+                    )}
+                </>
               ) : activeTable && controller && el.type === "table" ? (
                 <TableOverlay
                   key={id}
@@ -766,6 +904,17 @@ export const PresentationEditor = forwardRef<
             )}
           </svg>
         )}
+        {preview?.document === document &&
+          !props.onImagePreview &&
+          gallery.some((image) => image.id === preview.currentId) && (
+            <ImagePreviewDialog
+              gallery={gallery}
+              currentId={preview.currentId}
+              resolveAsset={props.resolveAsset}
+              onNavigate={(currentId) => setPreview({ document, currentId })}
+              onClose={() => setPreview(null)}
+            />
+          )}
       </div>
     </I18nProvider>
   );

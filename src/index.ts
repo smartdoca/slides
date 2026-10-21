@@ -20,3 +20,4 @@ export * from "./model/styles";
 export * from "./react/SlidePreview";
 
 export * from "./model/table";
+export * from "./model/image-preview";
