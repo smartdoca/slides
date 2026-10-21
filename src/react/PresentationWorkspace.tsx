@@ -88,6 +88,7 @@ import {
 } from "../model/anchors";
 import type { EditorSelection } from "../model/types";
 import { readDocument } from "../collaboration/yjs-codec";
+import type { PresentationImagePreviewHandler } from "../model/image-preview";
 
 export interface PresentationResources {
   uploadImage(
@@ -120,6 +121,8 @@ export interface PresentationWorkspaceProps {
   document: Y.Doc;
   readOnly?: boolean;
   resources?: PresentationResources;
+  /** Replaces the package lightbox with a host-owned gallery using stable asset references. */
+  onImagePreview?: PresentationImagePreviewHandler;
   saveLabel?: string;
   status?: string;
   members?: PresentationPresence[];
@@ -1695,6 +1698,7 @@ export const PresentationWorkspace = forwardRef<
                             : null
                         }
                         resolveAsset={props.resources?.resolveUrl}
+                        onImagePreview={props.onImagePreview}
                         onSelectionChange={(s) =>
                           paintSelection(
                             s?.type === "elements" ? s.elementIds : [],

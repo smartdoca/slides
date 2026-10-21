@@ -11,3 +11,4 @@ export * from "./collaboration/yjs-codec";
 export * from "./collaboration/origins";
 
 export * from "./model/table";
+export * from "./model/image-preview";

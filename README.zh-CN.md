@@ -4,7 +4,7 @@
 
 可嵌入的 React 协同演示文稿编辑器。画布使用 LeaferJS，文字使用 Slate，文档是 Yjs 结构。宿主负责身份、图片、权限和网络。
 
-许可证为 [MIT](LICENSE)。0.3.0-alpha.3 是预览版，不是完整的 PowerPoint 兼容。
+许可证为 [MIT](LICENSE)。0.3.0-alpha.4 是预览版，不是完整的 PowerPoint 兼容。
 
 ## 安装
 
@@ -35,6 +35,7 @@ export function Slides() {
 | `readOnly` | `boolean` | 停止编辑。 |
 | `chrome` | `"embedded" \| "demo"` | 嵌入模式没有演示用业务外壳。默认嵌入。 |
 | `resources` | `PresentationResources` | `uploadImage` 保存文件，`resolveUrl` 返回显示地址。 |
+| `onImagePreview` | `PresentationImagePreviewHandler` | 用所有幻灯片的稳定图片引用打开宿主图库。 |
 | `members` | `PresentationPresence[]` | 宿主提供的远端在线状态。 |
 | `sessionId` | `string` | 当前标签的会话。 |
 | `onPresence` | `(slideId, ids) => void` | 本地页面和元素选区。它不是内容写入。 |
@@ -73,4 +74,6 @@ export function Slides() {
 
 支持矩形/整行/整列选择、合并拆分、矩阵粘贴、Tab 导航与末格自动增行、行列尺寸拖动、整格文字和背景样式、右键菜单及一步撤销。原生 PPTX 保留合并、样式和尺寸。单元格仍为纯文本，尚无字符范围富文本或同格字符级协作。新表格操作使用 `codecRevision: 6`，宿主客户端与服务端须同步升级；生产宿主需单独适配。详见 [表格行为与验证](docs/TABLES.md)。
 
-本版变更、验证与宿主兼容要求见 [0.3.0-alpha.3 发布说明](docs/releases/0.3.0-alpha.3.md)。
+## 图片预览
+
+编辑时单击选中图片，再次点击或使用预览按钮放大；只读时可单击预览。默认弹层支持前后按钮、方向键、左右拖动/滑动和触控板切换所有幻灯片内的图片。传入 `onImagePreview` 后由宿主以稳定资源引用打开自己的授权预览。详见 [API 与资源边界](docs/IMAGE-PREVIEW.md)及 [0.3.0-alpha.4 发布说明](docs/releases/0.3.0-alpha.4.md)。

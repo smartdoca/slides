@@ -7,10 +7,11 @@ import {
   type PresentationPresence,
   type CommentAnchor,
   type CommentMarker,
-} from "@eppt/editor";
-import { readDocument } from "@eppt/editor/core";
-import { exportPptx } from "@eppt/editor/pptx";
-import "@eppt/editor/styles.css";
+  type PresentationImagePreviewHandler,
+} from "@smartdoca/slides";
+import { readDocument } from "@smartdoca/slides/core";
+import { exportPptx } from "@smartdoca/slides/pptx";
+import "@smartdoca/slides/styles.css";
 
 /** Adapter requirements, NOT a claim that Doca already exports these names. */
 interface HostSession {
@@ -42,11 +43,13 @@ export function DocaPresentation({
   resources,
   comments,
   locale,
+  onImagePreview,
 }: {
   session: HostSession;
   resources: HostResources;
   comments: HostComments;
   locale?: string;
+  onImagePreview?: PresentationImagePreviewHandler;
 }) {
   const editor = useRef<PresentationWorkspaceHandle>(null);
   if (!session.ready) return <div role="status">正在同步文稿…</div>;
@@ -83,6 +86,7 @@ export function DocaPresentation({
           document={session.document}
           readOnly={session.readOnly}
           resources={resources}
+          onImagePreview={onImagePreview}
           members={session.members}
           sessionId={session.sessionId}
           onPresence={session.publishSelection}
