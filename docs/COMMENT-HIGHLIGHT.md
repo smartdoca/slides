@@ -1,6 +1,6 @@
-# Controlled comment highlighting (candidate)
+# Controlled comment highlighting
 
-The current published `0.3.0-alpha.4` has comment markers, `onCommentAnchorClick` and `revealAnchor`, but no native temporary background API. This candidate adds only `PresentationWorkspaceProps.activeCommentId?: string | null`. It is not published or installed in Doca.
+`0.3.0-alpha.5` adds `PresentationWorkspaceProps.activeCommentId?: string | null`. The preceding `0.3.0-alpha.4` exposes comment markers, `onCommentAnchorClick` and `revealAnchor`, but does not expose this background API. Doca upgrades its host adapter separately using the official npm version.
 
 ```tsx
 <PresentationWorkspace
@@ -18,6 +18,6 @@ The highlight uses only the matching entry in `commentMarkers`. It does not sele
 
 The package resolves the existing anchor against the current document on each projection. A slide anchor covers its slide. An element anchor covers its native element rectangle, with its current rotation. An `elements` anchor paints each surviving element separately, without shading the gaps. Deletions immediately remove the corresponding region; a fully orphaned target, missing marker or invisible element does not produce a background. Live drag/resize geometry follows the native editor while interacting, with no idle animation loop.
 
-The existing anchor protocol is unchanged: table comments target the **whole table element**, not cells/merged-cell ranges; `text` relative anchors must still resolve and highlight their **whole text element**, not individual glyph ranges. This candidate does not add table-cell, text-glyph, cross-slide multi-area or legacy anchor semantics. Partially deleted multi-element anchors retain the existing `resolveAnchor` policy. The host supplies only current authorized/unresolved comments.
+The existing anchor protocol is unchanged: table comments target the **whole table element**, not cells/merged-cell ranges; `text` relative anchors must still resolve and highlight their **whole text element**, not individual glyph ranges. This release does not add table-cell, text-glyph, cross-slide multi-area or legacy anchor semantics. Partially deleted multi-element anchors retain the existing `resolveAnchor` policy. The host supplies only current authorized/unresolved comments.
 
-Highlighting works in both edit and readonly workspaces. The overlay has no pointer interaction and keeps native text/table editing and comment pins accessible. Changing/clearing the prop changes runtime view only: no model fill/style mutation, anchor rewrite, transaction, undo entry, transport, codec/schema, checkpoint, epoch, history or outbox change. No old-data reader, fallback, migration, conversion or host dependency change is introduced. Shared host integration documentation should be updated with the accepted package upgrade; this file describes the isolated candidate only.
+Highlighting works in both edit and readonly workspaces. The overlay has no pointer interaction and keeps native text/table editing and comment pins accessible. Changing/clearing the prop changes runtime view only: no model fill/style mutation, anchor rewrite, transaction, undo entry, transport, codec/schema, checkpoint, epoch, history or outbox change. No old-data reader, fallback, migration or conversion is introduced. Host dependency pins, integration documentation and compiled-host acceptance are updated separately by the host.

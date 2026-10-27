@@ -1,6 +1,6 @@
 {
   "name": "@smartdoca/slides",
-  "version": "0.3.0-alpha.4",
+  "version": "0.3.0-alpha.5",
   "description": "Embeddable React presentation editor with Leafer, Slate and Yjs",
   "license": "MIT",
   "type": "module",
