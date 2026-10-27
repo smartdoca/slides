@@ -69,6 +69,7 @@ import type { TextParagraph } from "../model/types";
 import { presentationOrder } from "../model/slides";
 import { FloatingToolbar } from "./FloatingToolbar";
 import { CommentPin } from "./CommentPin";
+import { CommentHighlight } from "./CommentHighlight";
 import { LayoutPicker } from "./LayoutPicker";
 import { createSlideLayout, type LayoutKind } from "../model/layouts";
 import { ChartDataEditor } from "./ChartDataEditor";
@@ -112,6 +113,8 @@ export interface PresentationWorkspaceProps {
   onSelectionChange?: (selection: EditorSelection) => void;
   renderCommentAction?: (anchor: CommentAnchor) => ReactNode;
   commentMarkers?: CommentMarker[];
+  /** Temporary view highlight. Host clears it with null/undefined and owns its lifetime. */
+  activeCommentId?: string | null;
   onCommentAnchorClick?: (candidates: CommentMarker[]) => void;
   onExportPng?: (result: {
     blob: Blob;
@@ -321,6 +324,9 @@ export const PresentationWorkspace = forwardRef<
       }
     : null;
   const commentAnchor = captureAnchor(selection);
+  const activeComment = props.commentMarkers?.find(
+    (marker) => marker.id === props.activeCommentId,
+  );
   useImperativeHandle(ref, () => ({
     getSelection: () => selection,
     captureAnchor: () => captureAnchor(selection),
@@ -1714,6 +1720,17 @@ export const PresentationWorkspace = forwardRef<
                         snapping={snapping}
                         onContextMenu={openElementMenu}
                       />
+                      {!presenting && activeComment && (
+                        <CommentHighlight
+                          document={props.document}
+                          anchor={activeComment.anchor}
+                          slideId={slideId}
+                          interacting={canvasInteracting}
+                          getTransform={(id) =>
+                            editorHandle.current?.getElementTransform?.(id)
+                          }
+                        />
+                      )}
                       {!presenting &&
                         props.onCommentAnchorClick &&
                         (props.commentMarkers ?? []).map((marker) => {

@@ -35,6 +35,8 @@ interface HostResources extends PresentationResources {
 interface HostComments {
   canCreate: boolean;
   markers: CommentMarker[];
+  /** Clear on timeout/drawer close. Comment activation/navigation remain host-owned. */
+  activeId?: string | null;
   create(anchor: CommentAnchor): void;
   open(candidates: CommentMarker[]): void;
 }
@@ -91,6 +93,7 @@ export function DocaPresentation({
           sessionId={session.sessionId}
           onPresence={session.publishSelection}
           commentMarkers={comments.markers}
+          activeCommentId={comments.activeId}
           onCommentAnchorClick={comments.open}
           renderCommentAction={
             comments.canCreate
