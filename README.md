@@ -40,6 +40,7 @@ Create the `Y.Doc` once for the document session. Readonly, selection, and panel
 | `sessionId` | `string` | This tab's session. |
 | `onPresence` | `(slideId, ids) => void` | Local slide and element selection. It is not a content write. |
 | `commentMarkers` | `CommentMarker[]` | Host-owned comments. |
+| `activeCommentId` | `string \| null` | Temporary background for a supplied comment marker; host controls activation and clearing. |
 | `onCommentAnchorClick` | function | Overlapping markers at the clicked anchor. |
 | `renderCommentAction` | function | Host action for one comment anchor. |
 | `onSelectionChange` | function | Local editor selection. |

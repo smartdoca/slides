@@ -40,6 +40,7 @@ export function Slides() {
 | `sessionId` | `string` | 当前标签的会话。 |
 | `onPresence` | `(slideId, ids) => void` | 本地页面和元素选区。它不是内容写入。 |
 | `commentMarkers` | `CommentMarker[]` | 宿主拥有的评论。 |
+| `activeCommentId` | `string \| null` | 为指定评论锚点临时着色；宿主控制激活和清除。 |
 | `onCommentAnchorClick` | function | 点击位置上重叠的标记。 |
 | `renderCommentAction` | function | 单个评论锚点的宿主操作。 |
 | `onSelectionChange` | function | 本地编辑器选区。 |

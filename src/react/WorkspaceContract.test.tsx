@@ -5,19 +5,31 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useSyncExternalStore,
 } from "react";
+import * as Y from "yjs";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, it, vi } from "vitest";
 import { createPresentation, createTextElement } from "../model/create";
 import { createYDocument, readDocument } from "../collaboration/yjs-codec";
 import { EditorController } from "../model/controller";
+import { presentationStore } from "../model/projection-store";
+import type { CommentMarker } from "../model/anchors";
+import { emuToPx, pxToEmu } from "../model/types";
 import {
   PresentationWorkspace,
   type PresentationWorkspaceHandle,
 } from "./PresentationWorkspace";
 const counters = vi.hoisted(() => ({ mounts: 0 }));
 vi.mock("./PresentationEditor", () => ({
-  usePresentation: readDocument,
+  usePresentation: (doc: Y.Doc) => {
+    const store = presentationStore(doc);
+    return useSyncExternalStore(
+      store.subscribe,
+      store.getSnapshot,
+      store.getSnapshot,
+    );
+  },
   ElementContent: () => null,
   PresentationEditor: forwardRef(function Fake(props: any, ref) {
     useEffect(() => {
@@ -588,4 +600,186 @@ it("opens the SVG zoom menu without changing scale and applies presets or fit wi
   expect(zoom()).toBe("45%");
   expect(writes).not.toHaveBeenCalled();
   doc.destroy();
+});
+
+it.each([false, true])(
+  "controls comment backgrounds independently of selection and marker callbacks (readonly=%s)",
+  (readOnly) => {
+    const doc = createYDocument(createPresentation()),
+      controller = new EditorController(doc);
+    const slideId = readDocument(doc).slideOrder[0],
+      textId = readDocument(doc).slides[slideId].elementOrder[0];
+    const tableId = controller.add(slideId, "table");
+    controller.patch(slideId, tableId, {
+      transform: { x: pxToEmu(600), y: pxToEmu(350), rotation: 15 },
+    });
+    controller.history.clear();
+    const snapshot = Y.encodeStateAsUpdate(doc),
+      writes = vi.fn(),
+      presence = vi.fn();
+    doc.on("update", writes);
+    const ref = createRef<PresentationWorkspaceHandle>();
+    const markers: CommentMarker[] = [
+      {
+        id: "multi",
+        anchor: {
+          type: "elements",
+          slideId,
+          elementIds: [textId, tableId, textId, "deleted"],
+        },
+      },
+      { id: "table", anchor: { type: "element", slideId, elementId: tableId } },
+      { id: "page", anchor: { type: "slide", slideId } },
+    ];
+    const render = (
+      activeCommentId?: string | null,
+      callback?: (candidates: CommentMarker[]) => void,
+      commentMarkers = markers,
+    ) =>
+      act(() =>
+        root.render(
+          <PresentationWorkspace
+            document={doc}
+            ref={ref}
+            readOnly={readOnly}
+            commentMarkers={commentMarkers}
+            activeCommentId={activeCommentId}
+            onCommentAnchorClick={callback}
+            onPresence={presence}
+          />,
+        ),
+      );
+    const regions = () => [
+      ...host.querySelectorAll<HTMLElement>(".eppt-comment-highlight-region"),
+    ];
+    render();
+    presence.mockClear(); // Existing readonly mount clears presence before activation.
+    render("multi");
+    expect(regions().map((node) => node.dataset.elementId)).toEqual([
+      textId,
+      tableId,
+    ]);
+    const table = readDocument(doc).slides[slideId].elements[tableId];
+    expect(regions()[1].style.width).toBe(
+      `${emuToPx(table.transform.width)}px`,
+    );
+    expect(regions()[1].style.transform).toBe("rotate(15deg)");
+    expect(ref.current!.getSelection()).toBeNull();
+    expect(host.querySelectorAll(".eppt-comment-marker")).toHaveLength(0);
+    const oldCallback = vi.fn(),
+      latestCallback = vi.fn();
+    render(null, oldCallback);
+    expect(regions()).toHaveLength(0);
+    render(null, latestCallback);
+    act(() =>
+      host.querySelector<HTMLButtonElement>(".eppt-comment-marker")!.click(),
+    );
+    expect(latestCallback).toHaveBeenCalledExactlyOnceWith(markers);
+    expect(oldCallback).not.toHaveBeenCalled();
+    expect(regions()).toHaveLength(0); // The host decides which overlapping comment to activate.
+    render("table", latestCallback);
+    expect(regions().map((node) => node.dataset.elementId)).toEqual([tableId]);
+    render("page");
+    expect(regions()).toHaveLength(1);
+    expect(regions()[0].style.width).toBe(
+      `${emuToPx(readDocument(doc).size.width)}px`,
+    );
+    render("missing");
+    expect(regions()).toHaveLength(0);
+    render("table", undefined, []);
+    expect(regions()).toHaveLength(0);
+    render(undefined);
+    expect(regions()).toHaveLength(0);
+    expect(writes).not.toHaveBeenCalled();
+    expect(presence).not.toHaveBeenCalled();
+    expect(controller.history.undoStack).toHaveLength(0);
+    expect(Y.encodeStateAsUpdate(doc)).toEqual(snapshot);
+    expect(counters.mounts).toBe(1);
+    controller.dispose();
+    doc.destroy();
+  },
+);
+
+it("follows remote anchor geometry and partial deletions without an echo or stale highlight", () => {
+  const doc = createYDocument(createPresentation()),
+    controller = new EditorController(doc);
+  const slideId = readDocument(doc).slideOrder[0],
+    textId = readDocument(doc).slides[slideId].elementOrder[0];
+  const tableId = controller.add(slideId, "table"),
+    second = controller.addSlide();
+  const secondId = controller.add(second, "text");
+  controller.history.clear();
+  const peer = new Y.Doc();
+  Y.applyUpdate(peer, Y.encodeStateAsUpdate(doc), "bootstrap");
+  const remoteController = new EditorController(peer),
+    writes = vi.fn();
+  peer.on("update", (update) => Y.applyUpdate(doc, update, "remote-test"));
+  doc.on("update", writes);
+  const ref = createRef<PresentationWorkspaceHandle>();
+  const markers: CommentMarker[] = [
+    {
+      id: "multi",
+      anchor: { type: "elements", slideId, elementIds: [textId, tableId] },
+    },
+    {
+      id: "second",
+      anchor: { type: "element", slideId: second, elementId: secondId },
+    },
+    { id: "text", anchor: controller.find("EPPT")[0].anchor },
+  ];
+  const render = (activeCommentId: string, document = doc) =>
+    act(() =>
+      root.render(
+        <PresentationWorkspace
+          document={document}
+          ref={ref}
+          commentMarkers={markers}
+          activeCommentId={activeCommentId}
+          readOnly
+        />,
+      ),
+    );
+  const regions = () => [
+    ...host.querySelectorAll<HTMLElement>(".eppt-comment-highlight-region"),
+  ];
+  render("text");
+  expect(regions().map((node) => node.dataset.elementId)).toEqual([textId]);
+  render("multi");
+  act(() =>
+    remoteController.patch(slideId, tableId, {
+      transform: { x: pxToEmu(720), width: pxToEmu(310) },
+    }),
+  );
+  expect(regions()[1].style.left).toBe("720px");
+  expect(regions()[1].style.width).toBe("310px");
+  act(() => remoteController.remove(slideId, [textId]));
+  expect(regions().map((node) => node.dataset.elementId)).toEqual([tableId]);
+  render("text");
+  expect(regions()).toHaveLength(0);
+  render("multi");
+  act(() => remoteController.remove(slideId, [tableId]));
+  expect(regions()).toHaveLength(0);
+  expect(writes).toHaveBeenCalledTimes(3);
+  expect(writes.mock.calls.every((call) => call[1] === "remote-test")).toBe(
+    true,
+  );
+  expect(controller.history.undoStack).toHaveLength(0);
+  render("second");
+  expect(regions()).toHaveLength(0);
+  act(() => {
+    expect(ref.current!.revealAnchor(markers[1].anchor)).toBe(true);
+  });
+  expect(regions().map((node) => node.dataset.elementId)).toEqual([secondId]);
+  expect(writes).toHaveBeenCalledTimes(3);
+  act(() => remoteController.deleteSlide(second));
+  expect(regions()).toHaveLength(0);
+  expect(writes).toHaveBeenCalledTimes(4);
+  const other = createYDocument(createPresentation());
+  render("second", other);
+  expect(regions()).toHaveLength(0);
+  controller.dispose();
+  remoteController.dispose();
+  doc.destroy();
+  peer.destroy();
+  other.destroy();
 });
