@@ -524,7 +524,7 @@ it("updates interface copy when locale changes and leaves the document mounted",
     "en",
   );
   act(() => root.render(<PresentationWorkspace document={doc} locale="ja" />));
-  expect(host.querySelector('[aria-label="Start slideshow"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="スライドショーを開始する"]')).not.toBeNull();
   expect(counters.mounts).toBe(1);
   expect(writes).not.toHaveBeenCalled();
   doc.destroy();

@@ -46,7 +46,7 @@ Create the `Y.Doc` once for the document session. Readonly, selection, and panel
 | `onSelectionChange` | function | Local editor selection. |
 | `panels` | slides, properties, notes | Which side panels are open. |
 | `presentation` | `boolean` | Slideshow mode. |
-| `locale` | `string` | Defaults to Chinese. Unknown codes use English. |
+| `locale` | `string` | `zh`, `en`, `zh-Hant`, `ja`, `fr`, `ko`, `es`, `ru`. Omitted uses Simplified Chinese. Unknown codes use English. |
 | `messages` | `Record<string, string>` | Replaces individual catalog keys. Document content stays unchanged. |
 | `onExport` | function | Host export for `pptx`, `json`, or `pdf`. |
 | `onImport` | function | Host import of one file. |

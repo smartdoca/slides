@@ -46,7 +46,7 @@ export function Slides() {
 | `onSelectionChange` | function | 本地编辑器选区。 |
 | `panels` | 幻灯片、属性、备注 | 哪些侧栏打开。 |
 | `presentation` | `boolean` | 放映模式。 |
-| `locale` | `string` | 默认中文。未知代码使用英文。 |
+| `locale` | `string` | `zh`, `en`, `zh-Hant`, `ja`, `fr`, `ko`, `es`, `ru`。缺省使用简体中文，未知代码使用英文。 |
 | `messages` | `Record<string, string>` | 替换单个文案键。不改变文档内容。 |
 | `onExport` | function | 宿主导出 `pptx`、`json` 或 `pdf`。 |
 | `onImport` | function | 宿主导入一个文件。 |

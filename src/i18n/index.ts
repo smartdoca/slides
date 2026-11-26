@@ -1,5 +1,6 @@
 import { createContext, createElement, useContext, useMemo, type ReactNode } from "react";
 import { en, zh, type MessageKey } from "./catalog";
+import { additionalCatalogs } from "./locales";
 
 export type Translator = (
   key: string,
@@ -10,16 +11,18 @@ export type Phrase =
   | { key: string; vars?: Record<string, string | number> }
   | { text: string };
 
-const catalogs: Record<string, Record<string, string>> = { zh, en };
+const catalogs = { zh, en, ...additionalCatalogs };
+type EditorLocale = keyof typeof catalogs;
 
 /** Missing locale stays Chinese. Any other unknown code uses English. */
-export function resolveLocale(locale?: string) {
-  if (!locale || locale === "zh") return "zh";
-  return locale in catalogs ? locale : "en";
+export function resolveLocale(locale?: string): EditorLocale {
+  if (!locale) return "zh";
+  return Object.hasOwn(catalogs, locale) ? locale as EditorLocale : "en";
 }
 
 export function htmlLang(locale?: string) {
-  return resolveLocale(locale) === "zh" ? "zh-CN" : "en";
+  const code = resolveLocale(locale);
+  return code === "zh" ? "zh-CN" : code;
 }
 
 function lookup(

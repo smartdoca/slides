@@ -9,15 +9,16 @@ it("uses the same keys in Chinese and English", () => {
 it("defaults to Chinese, falls unknown codes back to English, and applies overrides", () => {
   const zhText = createTranslator();
   const enText = createTranslator("en");
-  const fallback = createTranslator("fr");
+  const fallback = createTranslator("ar");
   const custom = createTranslator("en", { "toolbar.bold": "Strong" });
   expect(resolveLocale()).toBe("zh");
   expect(resolveLocale("zh")).toBe("zh");
   expect(resolveLocale("en")).toBe("en");
-  expect(resolveLocale("ja")).toBe("en");
+  expect(resolveLocale("ja")).toBe("ja");
+  expect(resolveLocale("ar")).toBe("en");
   expect(htmlLang()).toBe("zh-CN");
   expect(htmlLang("en")).toBe("en");
-  expect(htmlLang("ja")).toBe("en");
+  expect(htmlLang("ja")).toBe("ja");
   expect(zhText("toolbar.bold")).toBe("加粗");
   expect(enText("toolbar.bold")).toBe("Bold");
   expect(fallback("toolbar.present")).toBe("Start slideshow");
